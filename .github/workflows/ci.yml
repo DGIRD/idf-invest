@@ -1,0 +1,38 @@
+name: CI
+on:
+  push:
+    branches: [main, immo-zen]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verifier:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Dépendances
+        run: npm install --no-audit --no-fund
+      - name: Typage strict
+        run: npm run typecheck
+      - name: Tests unitaires (simulateur, reprise, import, exports)
+        run: |
+          pip install --quiet openpyxl || true
+          npm test
+      - name: Tests SQL (migrations, RLS deux comptes, réversibilité)
+        run: npm run test:db
+      - name: Build (mode démonstration, sans projet Supabase)
+        run: npm run build
+      - name: Tests navigateur (bureau et mobile)
+        run: |
+          npx playwright install --with-deps chromium
+          npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: captures-e2e
+          path: test-results/
