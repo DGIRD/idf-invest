@@ -1,0 +1,15 @@
+{
+  "name": "Immo-Zen",
+  "short_name": "Immo-Zen",
+  "description": "Prospectez, investissez et gérez vos locations sereinement.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f5f7f5",
+  "theme_color": "#1f4a45",
+  "lang": "fr",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

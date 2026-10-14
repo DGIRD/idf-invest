@@ -1,0 +1,54 @@
+import { useStore } from './data/store.tsx';
+import { AuthPage, NewPasswordPage } from './pages/Auth.tsx';
+import { ComingSoonPage } from './pages/ComingSoon.tsx';
+import { ContactDetailPage, ContactsPage } from './pages/Contacts.tsx';
+import { DashboardPage } from './pages/Dashboard.tsx';
+import { OwnedPage } from './pages/Owned.tsx';
+import { PropertyDetailPage } from './pages/PropertyDetail.tsx';
+import { PropertyFormPage } from './pages/PropertyForm.tsx';
+import { ProspectionPage } from './pages/Prospection.tsx';
+import { SettingsPage } from './pages/Settings.tsx';
+import { SimulatorPage } from './pages/Simulator.tsx';
+import { Layout, NAV } from './ui/Layout.tsx';
+import { EmptyState, Button } from './ui/components.tsx';
+import { navigate, useRoute } from './ui/router.ts';
+
+export function App() {
+  const { session, authReady, data, sync } = useStore();
+  const route = useRoute();
+  const [a, b, c] = route.path;
+
+  if (!authReady) return <div className="boot">Immo-Zen</div>;
+  if (a === 'nouveau-mot-de-passe' && session) return <NewPasswordPage />;
+  if (!session) return <AuthPage />;
+
+  let active = 'dashboard';
+  let page: React.ReactNode;
+  const key = location.hash;
+
+  if (!a) page = <DashboardPage />;
+  else if (a === 'prospection') { active = 'prospection'; page = <ProspectionPage />; }
+  else if (a === 'biens') { active = 'biens'; page = <OwnedPage />; }
+  else if (a === 'bien' && b === 'nouveau') {
+    const mode = route.query.get('mode') === 'owned' ? 'owned' : 'prospect';
+    active = mode === 'owned' ? 'biens' : 'prospection';
+    page = <PropertyFormPage key={key} mode={mode} />;
+  } else if (a === 'bien' && b) {
+    const p = data.properties.find((x) => x.id === b);
+    active = p?.status === 'acquis' ? 'biens' : 'prospection';
+    if (!p && sync.state === 'loading') page = <p className="muted">Chargement…</p>;
+    else page = c === 'modifier' ? <PropertyFormPage key={key} id={b} mode={p?.status === 'acquis' ? 'owned' : 'prospect'} /> : <PropertyDetailPage id={b} />;
+  } else if (a === 'simulateur') {
+    active = 'simulateur';
+    if (b && !data.scenarios.some((s) => s.id === b) && sync.state === 'loading') page = <p className="muted">Chargement…</p>;
+    else page = <SimulatorPage key={key} scenarioId={b} propertyId={route.query.get('bien') ?? undefined} />;
+  } else if (a === 'contacts') { active = 'contacts'; page = b ? <ContactDetailPage key={b} id={b} /> : <ContactsPage />; }
+  else if (a === 'parametres') { active = 'parametres'; page = <SettingsPage />; }
+  else {
+    const item = NAV.find((n) => n.path === `/${a}`);
+    if (item?.plannedLot) { active = item.key; page = <ComingSoonPage item={item} />; }
+    else page = <EmptyState title="Page introuvable" action={<Button onClick={() => navigate('/')}>Tableau de bord</Button>} />;
+  }
+
+  return <Layout active={active}>{page}</Layout>;
+}

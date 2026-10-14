@@ -1,0 +1,69 @@
+import { useMemo, useState } from 'react';
+import { useStore } from '../data/store.tsx';
+import type { OccupationStatus } from '../data/types.ts';
+import { OCCUPATION_LABELS } from '../domain/labels.ts';
+import { isOwned } from '../domain/property.ts';
+import { DataTable } from '../ui/DataTable.tsx';
+import { Button, EmptyState, PageHeader, useConfirm } from '../ui/components.tsx';
+import { navigate } from '../ui/router.ts';
+import { exportRows, ownedColumns, usePropertyRows } from './propertyShared.tsx';
+import { usePropertyActions } from './useActions.tsx';
+
+export function OwnedPage() {
+  const { data, update } = useStore();
+  const { ask, dialog } = useConfirm();
+  const actions = usePropertyActions(ask);
+  const [occ, setOcc] = useState<OccupationStatus | ''>('');
+  const all = usePropertyRows(isOwned);
+  const columns = useMemo(() => ownedColumns(), []);
+  const rows = all.filter((r) => !occ || r.p.occupation_status === occ);
+
+  return (
+    <>
+      <PageHeader title="Mes biens" subtitle="Les biens que vous détenez : acquis depuis la prospection ou ajoutés directement."
+        actions={<Button variant="primary" onClick={() => navigate('/bien/nouveau?mode=owned')}>Ajouter un bien détenu</Button>} />
+      <DataTable
+        id="mes-biens"
+        rows={rows}
+        columns={columns}
+        rowKey={(r) => r.p.id}
+        initialSort={{ id: 'acquired', dir: 'desc' }}
+        onOpen={(r) => navigate(`/bien/${r.p.id}`)}
+        searchPlaceholder="Rechercher un bien, une adresse…"
+        toolbar={
+          <label className="inline-select">Occupation
+            <select value={occ} onChange={(e) => setOcc(e.target.value as OccupationStatus | '')}>
+              <option value="">Toutes</option>
+              {(Object.keys(OCCUPATION_LABELS) as OccupationStatus[]).map((o) => <option key={o} value={o}>{OCCUPATION_LABELS[o]}</option>)}
+            </select>
+          </label>
+        }
+        rowActions={(r) => [
+          { label: 'Ouvrir la fiche', onSelect: () => navigate(`/bien/${r.p.id}`) },
+          { label: 'Modifier', onSelect: () => navigate(`/bien/${r.p.id}/modifier`) },
+          ...(Object.keys(OCCUPATION_LABELS) as OccupationStatus[]).filter((o) => o !== r.p.occupation_status && o !== 'loue')
+            .map((o) => ({ label: `Occupation : ${OCCUPATION_LABELS[o]}`, onSelect: () => void update('properties', r.p, { occupation_status: o }, `Le bien « ${r.p.title} »`) })),
+          { label: 'Revenir en prospection', onSelect: () => void actions.setStatus(r.p, 'sous_compromis') },
+          { label: 'Supprimer', danger: true, onSelect: () => void actions.del(r.p) },
+        ]}
+        bulkActions={(sel) => <>
+          <Button size="sm" onClick={() => void exportRows('xlsx', 'mes-biens', columns, sel, data.scenarios)}>Excel</Button>
+          <Button size="sm" onClick={() => void exportRows('csv', 'mes-biens', columns, sel, data.scenarios)}>CSV</Button>
+          <Button size="sm" onClick={() => void exportRows('json', 'mes-biens', columns, sel, data.scenarios)}>JSON</Button>
+        </>}
+        empty={<EmptyState title="Aucun bien détenu pour l’instant"
+          action={<Button variant="primary" onClick={() => navigate('/bien/nouveau?mode=owned')}>Ajouter un bien détenu</Button>}>
+          Un bien passé au statut « Acquis » en prospection apparaît ici automatiquement, avec son historique.
+        </EmptyState>}
+      />
+      <p className="muted small">Le statut « Loué », le locataire actif, les encaissements, les dépenses et le cash-flow réel seront alimentés par les baux et paiements (lot 2). Le cash-flow affiché est celui de la simulation.</p>
+      <div className="export-row">
+        <span className="muted">Exporter la liste affichée :</span>
+        <Button size="sm" onClick={() => void exportRows('xlsx', 'mes-biens', columns, rows, data.scenarios)}>Excel (.xlsx)</Button>
+        <Button size="sm" onClick={() => void exportRows('csv', 'mes-biens', columns, rows, data.scenarios)}>CSV</Button>
+        <Button size="sm" onClick={() => void exportRows('json', 'mes-biens', columns, rows, data.scenarios)}>JSON</Button>
+      </div>
+      {dialog}
+    </>
+  );
+}

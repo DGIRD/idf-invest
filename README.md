@@ -1,9 +1,41 @@
-# IDF Invest PWA
-1. Créez un projet Supabase gratuit.
-2. Exécutez `supabase.sql` dans SQL Editor.
-3. Copiez l’URL du projet et la clé publique anon dans `config.js`.
-4. Activez l’authentification Email dans Supabase.
-5. Publiez tous les fichiers sur un hébergement HTTPS statique, par exemple GitHub Pages.
-6. Ouvrez l’URL sur PC ou téléphone et utilisez « Installer » / « Sur l’écran d’accueil ».
+# Immo-Zen
 
-Ne mettez jamais la clé `service_role` dans `config.js`.
+*Prospectez, investissez et gérez vos locations sereinement.*
+
+Application web progressive (PWA) de prospection immobilière et de gestion locative pour particuliers. Elle succède à **IDF Invest**, dont les données sont reprises.
+
+> **État : lot 1 livré** (socle, prospection, Mes biens, simulateur, contacts, reprise IDF Invest). Les rubriques des lots 2 et 3 sont visibles dans le menu mais signalées « non disponibles ». Détail exact : [docs/ETAT-DU-PROJET.md](docs/ETAT-DU-PROJET.md).
+
+## Démarrer en local
+
+```bash
+npm install
+npm run dev          # http://127.0.0.1:5173 — sans .env : mode démonstration (données dans le navigateur)
+```
+
+Pour travailler contre un vrai projet Supabase, copiez `.env.example` en `.env` et renseignez l'URL et la clé **publique** du projet.
+
+## Vérifier
+
+```bash
+npm run typecheck    # TypeScript strict
+npm test             # tests unitaires : simulateur, reprise, import, exports CSV/XLSX
+npm run test:db      # tests SQL sur un PostgreSQL local jetable : migrations, RLS entre deux comptes, annulation
+npm run build && npm run test:e2e   # parcours navigateur bureau et mobile, captures dans test-results/
+```
+
+## Documentation
+
+| Document | Contenu |
+|---|---|
+| [ETAT-DU-PROJET](docs/ETAT-DU-PROJET.md) | Implémenté, testé, à configurer, restant ; limites connues |
+| [ARCHITECTURE](docs/ARCHITECTURE.md) | Choix techniques, structure du code, environnements |
+| [MIGRATION-IDF-INVEST](docs/MIGRATION-IDF-INVEST.md) | Analyse de l'existant, correspondances, sauvegarde, annulation |
+| [FORMULES-SIMULATEUR](docs/FORMULES-SIMULATEUR.md) | Formules, conventions, arrondis |
+| [SECURITE](docs/SECURITE.md) | Isolation des données, RLS, secrets, synchronisation |
+| [DEPLOIEMENT](docs/DEPLOIEMENT.md) | Mise en service pas à pas, sauvegarde et restauration |
+| [GUIDE-UTILISATEUR](docs/GUIDE-UTILISATEUR.md) | Utilisation de l'application |
+| [SERVICES-A-CONNECTER](docs/SERVICES-A-CONNECTER.md) | Supabase, Stripe, e-mails… |
+| [TESTS](docs/TESTS.md) | Ce qui est testé et derniers résultats |
+
+L'ancienne application est conservée, non publiée, dans `legacy/idf-invest/` pour référence.

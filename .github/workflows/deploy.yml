@@ -1,0 +1,53 @@
+# Publication sur GitHub Pages à chaque fusion dans main.
+# Prérequis (voir docs/DEPLOIEMENT.md) :
+#   - Settings > Pages > Source : « GitHub Actions »
+#   - Projet Supabase : valeurs publiques ci-dessous (reprises de l'ancien config.js d'IDF Invest).
+#     Des variables du dépôt IMMOZEN_SUPABASE_URL / IMMOZEN_SUPABASE_ANON_KEY les remplacent si elles existent.
+#   - Migrations SQL appliquées sur le projet Supabase AVANT la fusion
+name: Déploiement
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - run: npm run typecheck && npm test
+      - name: Build production
+        env:
+          IMMOZEN_ENV: production
+          # Clé PUBLIQUE (publishable) : sans danger dans le dépôt, protégée par les règles RLS.
+          IMMOZEN_SUPABASE_URL: ${{ vars.IMMOZEN_SUPABASE_URL || 'https://sbxnjvjsapnsdeenmvtm.supabase.co' }}
+          IMMOZEN_SUPABASE_ANON_KEY: ${{ vars.IMMOZEN_SUPABASE_ANON_KEY || 'sb_publishable_hiwOqpGzB5MTy7lZSNH_Ow_ZYxw85ha' }}
+        run: |
+          if [ -z "$IMMOZEN_SUPABASE_URL" ]; then echo "Variable IMMOZEN_SUPABASE_URL manquante : refus de publier un site en mode démonstration."; exit 1; fi
+          npm run build
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,233 @@
+import { useEffect, useMemo, useState } from 'react';
+import { useStore } from '../data/store.tsx';
+import type { Scenario } from '../data/types.ts';
+import { downloadBlob, stamp, toXlsx } from '../domain/exporting.ts';
+import { money, money2, pct } from '../domain/format.ts';
+import { inputsFromProperty } from '../domain/property.ts';
+import { ENGINE_VERSION, normalizeInputs, simulate, summarize, type FieldError, type SimulationInputs } from '../domain/simulator.ts';
+import { Button, Checkbox, NumberInput, PageHeader, Section, Select, TextInput } from '../ui/components.tsx';
+import { href, navigate } from '../ui/router.ts';
+
+export function SimulatorPage({ scenarioId, propertyId }: { scenarioId?: string; propertyId?: string }) {
+  const { data, simulatorDefaults, create, update, notify } = useStore();
+  const scenario = scenarioId ? data.scenarios.find((s) => s.id === scenarioId) : undefined;
+  const initialProperty = scenario?.property_id ?? propertyId ?? null;
+  const property = initialProperty ? data.properties.find((p) => p.id === initialProperty) : undefined;
+
+  const initial = useMemo<SimulationInputs>(() => {
+    if (scenario) return normalizeInputs(scenario.inputs, simulatorDefaults);
+    if (property) return inputsFromProperty(property, simulatorDefaults);
+    return { ...simulatorDefaults };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scenario?.id, property?.id]);
+
+  const [inputs, setInputs] = useState<SimulationInputs>(initial);
+  const [name, setName] = useState(scenario?.name ?? (property ? `Scénario ${data.scenarios.filter((s) => s.property_id === property.id).length + 1}` : 'Simulation'));
+  const [linked, setLinked] = useState<string | null>(initialProperty);
+  const [detail, setDetail] = useState<'annuel' | 'mensuel' | null>(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { setInputs(initial); }, [initial]);
+
+  const outcome = useMemo(() => simulate(inputs), [inputs]);
+  const err = (f: keyof SimulationInputs) => (!outcome.ok ? outcome.errors.find((e: FieldError) => e.field === f)?.message : undefined);
+  const set = <K extends keyof SimulationInputs>(k: K, v: SimulationInputs[K] | null) => setInputs((i) => ({ ...i, [k]: v ?? (typeof i[k] === 'number' ? 0 : i[k]) }));
+  const num = (k: keyof SimulationInputs, label: string, suffix: string, hint?: string) => (
+    <NumberInput label={label} suffix={suffix} value={inputs[k] as number} onChange={(v) => set(k, (v ?? 0) as never)} error={err(k)} hint={hint} />
+  );
+  const dirty = JSON.stringify(inputs) !== JSON.stringify(initial) || name !== (scenario?.name ?? name) || linked !== initialProperty;
+
+  async function save(asNew: boolean) {
+    if (!outcome.ok) { notify('Corrigez les valeurs signalées avant d’enregistrer.', 'error'); return; }
+    setBusy(true);
+    try {
+      const payload = { name: name.trim() || 'Scénario', inputs, results: summarize(outcome.result), engine_version: ENGINE_VERSION, property_id: linked };
+      let saved: Scenario | null;
+      if (scenario && !asNew) saved = await update('scenarios', scenario, payload, `Le scénario « ${scenario.name} »`);
+      else saved = await create('scenarios', payload);
+      if (!saved) return;
+      const prop = linked ? data.properties.find((p) => p.id === linked) : undefined;
+      if (prop && !prop.primary_scenario_id) await update('properties', prop, { primary_scenario_id: saved.id }, `Le bien « ${prop.title} »`);
+      notify('Simulation enregistrée.');
+      if (!scenario || asNew || saved.id !== scenarioId) navigate(`/simulateur/${saved.id}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function exportAmortization() {
+    if (!outcome.ok) return;
+    const r = outcome.result;
+    const blob = await toXlsx([
+      { name: 'Par année', rows: r.years, columns: [
+        { label: 'Année', value: (y) => y.year, kind: 'number' }, { label: 'Échéances crédit', value: (y) => y.payments, kind: 'money' },
+        { label: 'Intérêts', value: (y) => y.interest, kind: 'money' }, { label: 'Capital remboursé', value: (y) => y.principal, kind: 'money' },
+        { label: 'Assurance', value: (y) => y.insurance, kind: 'money' }, { label: 'Capital restant dû', value: (y) => y.balance, kind: 'money' },
+      ] },
+      { name: 'Par mois', rows: r.amortization, columns: [
+        { label: 'Mois', value: (m) => m.month, kind: 'number' }, { label: 'Phase', value: (m) => m.phase },
+        { label: 'Échéance crédit', value: (m) => m.payment, kind: 'money' }, { label: 'Intérêts', value: (m) => m.interest, kind: 'money' },
+        { label: 'Intérêts capitalisés', value: (m) => m.capitalized, kind: 'money' }, { label: 'Capital', value: (m) => m.principal, kind: 'money' },
+        { label: 'Assurance', value: (m) => m.insurance, kind: 'money' }, { label: 'Capital restant dû', value: (m) => m.balance, kind: 'money' },
+      ] },
+    ]);
+    downloadBlob(blob, `immo-zen-amortissement-${stamp()}.xlsx`);
+  }
+
+  if (scenarioId && !scenario) return <PageHeader title="Simulation introuvable" subtitle="Elle a peut-être été supprimée." />;
+  const r = outcome.ok ? outcome.result : null;
+  const linkedProperty = linked ? data.properties.find((p) => p.id === linked) : undefined;
+
+  return (
+    <>
+      <PageHeader title={scenario ? scenario.name : 'Simulateur'}
+        subtitle={linkedProperty ? <>Bien : <a href={href(`/bien/${linkedProperty.id}`)}>{linkedProperty.title}</a></> : 'Simulation libre, non rattachée à un bien.'}
+        actions={<>
+          {scenario && <Button onClick={() => void save(true)} disabled={busy}>Enregistrer comme nouveau scénario</Button>}
+          <Button variant="primary" onClick={() => void save(false)} disabled={busy || !outcome.ok}>{busy ? 'Enregistrement…' : 'Enregistrer'}</Button>
+        </>} />
+      {dirty && <p className="unsaved" role="status">Modifications non enregistrées.</p>}
+      {scenario?.engine_version === 'legacy-idf-invest' && (
+        <p className="note">Simulation reprise d’IDF Invest. Les frais de notaire saisis à l’époque sont conservés en montant. Les résultats sont recalculés avec les formules Immo-Zen : le cash-flow peut différer de l’ancienne application, qui mélangeait deux méthodes (« mode simplifié »).</p>
+      )}
+
+      <div className="sim-layout">
+        <div>
+          <Section title="Rattachement">
+            <div className="grid">
+              <TextInput label="Nom du scénario" wide value={name} onChange={setName} maxLength={120} />
+              <Select label="Bien" wide value={linked} onChange={setLinked} allowEmpty="Aucun (simulation libre)"
+                options={data.properties.filter((p) => p.status !== 'archive' || p.id === linked).map((p) => [p.id, p.title] as const)} />
+            </div>
+          </Section>
+
+          <Section title="Acquisition">
+            <div className="grid">
+              <Select label="Le prix proposé est" value={inputs.priceMode} onChange={(v) => set('priceMode', v ?? 'hors_honoraires')}
+                options={[['hors_honoraires', 'Hors honoraires'], ['honoraires_inclus', 'Honoraires inclus']] as const} />
+              {num('price', 'Prix proposé', '€')}
+              {num('agencyFees', inputs.priceMode === 'honoraires_inclus' ? 'Dont honoraires d’agence' : 'Frais d’agence', '€')}
+              <Select label="Frais de notaire" value={inputs.notaryMode} onChange={(v) => set('notaryMode', v ?? 'percent')}
+                options={[['percent', 'En % du prix'], ['amount', 'Montant connu']] as const} />
+              {inputs.notaryMode === 'percent' ? num('notaryRate', 'Taux frais de notaire', '%') : num('notaryAmount', 'Montant frais de notaire', '€')}
+              {num('works', 'Travaux', '€')}
+              {num('furniture', 'Mobilier', '€')}
+              {num('guaranteeFees', 'Frais de garantie', '€', 'Caution ou hypothèque')}
+              {num('dossierFees', 'Frais de dossier', '€')}
+            </div>
+          </Section>
+
+          <Section title="Financement">
+            <Checkbox label="Financer par un crédit" checked={inputs.useLoan} onChange={(v) => set('useLoan', v)} />
+            {inputs.useLoan && (
+              <div className="grid">
+                {num('downPayment', 'Apport', '€')}
+                {num('interestRate', 'Taux du crédit', '% / an', 'Taux nominal, hors assurance')}
+                {num('loanYears', 'Durée', 'ans')}
+                {num('insuranceRate', 'Assurance emprunteur', '% / an', 'Sur le capital initial')}
+                <Select label="Différé" value={inputs.deferralType} onChange={(v) => set('deferralType', v ?? 'aucun')}
+                  options={[['aucun', 'Aucun'], ['partiel', 'Partiel : intérêts seuls'], ['total', 'Total : intérêts capitalisés']] as const}
+                  hint={inputs.deferralType === 'partiel' ? 'Pendant le différé, seuls les intérêts et l’assurance sont payés.' : inputs.deferralType === 'total' ? 'Pendant le différé, rien n’est payé hors assurance ; les intérêts s’ajoutent au capital.' : undefined} />
+                {inputs.deferralType !== 'aucun' && num('deferralMonths', 'Durée du différé', 'mois', 'Comprise dans la durée totale')}
+              </div>
+            )}
+          </Section>
+
+          <Section title="Loyers et charges">
+            <div className="grid">
+              {num('monthlyRent', 'Loyer hors charges', '€ / mois')}
+              {num('chargesProvisionMonthly', 'Provisions sur charges', '€ / mois', 'Versées par le locataire')}
+              {num('coproChargesAnnual', 'Charges de copropriété', '€ / an')}
+              {num('coproRecoverableAnnual', 'dont récupérables', '€ / an')}
+              {num('propertyTaxAnnual', 'Taxe foncière', '€ / an')}
+              {num('propertyTaxRecoverableAnnual', 'dont part récupérable', '€ / an', 'Taxe d’enlèvement des ordures ménagères')}
+              {num('pnoAnnual', 'Assurance PNO', '€ / an')}
+              {num('managementAnnual', 'Gestion locative', '€ / an')}
+              {num('gliAnnual', 'GLI', '€ / an', 'Garantie loyers impayés')}
+              {num('maintenanceAnnual', 'Entretien', '€ / an')}
+              {num('vacancyAnnual', 'Vacance locative', '€ / an', 'Loyers perdus estimés')}
+              {num('otherChargesAnnual', 'Autres charges', '€ / an')}
+            </div>
+          </Section>
+        </div>
+
+        <aside className="sim-results" aria-live="polite">
+          {!outcome.ok ? (
+            <div className="results-error" role="alert">
+              <h2>Valeurs à corriger</h2>
+              <ul>{outcome.errors.map((e) => <li key={e.field + e.message}>{e.message}</li>)}</ul>
+            </div>
+          ) : r && (
+            <>
+              <div className={`cashflow ${r.cashflowMonthlyYear1 >= 0 ? 'pos' : 'neg'}`}>
+                <span>Cash-flow avant fiscalité</span>
+                <strong>{money(r.cashflowMonthlyYear1)}<small> / mois</small></strong>
+                <span className="muted small">moyenne de l’année 1, soit {money(r.cashflowAnnualYear1)} / an</span>
+                {inputs.useLoan && inputs.deferralType !== 'aucun' && <span className="muted small">après le différé : {money(r.cashflowMonthlySteady)} / mois</span>}
+              </div>
+              <dl className="results">
+                <div><dt>Coût total de l’opération</dt><dd>{money(r.totalCost)}</dd></div>
+                <div className="sub"><dt>Prix hors honoraires</dt><dd>{money(r.netPrice)}</dd></div>
+                <div className="sub"><dt>Frais de notaire</dt><dd>{money(r.notaryFees)}</dd></div>
+                <div className="sub"><dt>Frais d’agence</dt><dd>{money(r.agencyFees)}</dd></div>
+                <div><dt>Apport utilisé</dt><dd>{money(r.equity)}</dd></div>
+                <div><dt>Emprunt</dt><dd>{money(r.loanAmount)}</dd></div>
+                <div><dt>Mensualité de crédit</dt><dd>{money2(r.monthlyPayment)}</dd></div>
+                <div><dt>Assurance mensuelle</dt><dd>{money2(r.monthlyInsurance)}</dd></div>
+                <div><dt>Mensualité totale</dt><dd>{money2(r.monthlyPaymentWithInsurance)}</dd></div>
+                <div><dt>Coût du financement</dt><dd>{money(r.financingCost)}</dd></div>
+                <div className="sub"><dt>Intérêts</dt><dd>{money(r.totalInterest)}</dd></div>
+                <div className="sub"><dt>Assurance</dt><dd>{money(r.totalInsurance)}</dd></div>
+                <div className="sub"><dt>Garantie et dossier</dt><dd>{money(r.financingFees)}</dd></div>
+                <div><dt>Loyers annuels</dt><dd>{money(r.annualRent)}</dd></div>
+                <div><dt>Charges non récupérables</dt><dd>{money(r.annualOwnerCharges)}</dd></div>
+                <div><dt>Vacance</dt><dd>{money(r.annualVacancy)}</dd></div>
+                <div><dt>Revenu net avant crédit</dt><dd>{money(r.annualNetOperatingIncome)}</dd></div>
+                <div><dt>Rendement brut</dt><dd>{pct(r.grossYield)}</dd></div>
+                <div><dt>Rendement après charges</dt><dd>{pct(r.netYield)}</dd></div>
+                <div><dt>Capital remboursé année 1</dt><dd>{money(r.year1PrincipalRepaid)}</dd></div>
+              </dl>
+              <p className="muted small">Le capital remboursé n’est pas une charge : il diminue la trésorerie mais constitue votre patrimoine. Aucune fiscalité n’est calculée.</p>
+              {r.warnings.length > 0 && <ul className="warnings">{r.warnings.map((w) => <li key={w}>{w}</li>)}</ul>}
+            </>
+          )}
+        </aside>
+      </div>
+
+      {r && r.amortization.length > 0 && (
+        <Section title="Tableau d’amortissement" actions={<>
+          <Button size="sm" onClick={() => setDetail(detail === 'annuel' ? null : 'annuel')}>{detail === 'annuel' ? 'Masquer' : 'Par année'}</Button>
+          <Button size="sm" onClick={() => setDetail(detail === 'mensuel' ? null : 'mensuel')}>{detail === 'mensuel' ? 'Masquer' : 'Par mois'}</Button>
+          <Button size="sm" onClick={() => void exportAmortization()}>Excel (.xlsx)</Button>
+        </>}>
+          {detail === 'annuel' && (
+            <div className="dt-scroll"><table className="dt-table compact">
+              <thead><tr><th>Année</th><th className="num">Échéances</th><th className="num">Intérêts</th><th className="num">Capital</th><th className="num">Assurance</th><th className="num">Restant dû</th></tr></thead>
+              <tbody>{r.years.map((y) => <tr key={y.year}><td>{y.year}</td><td className="num">{money2(y.payments)}</td><td className="num">{money2(y.interest)}</td><td className="num">{money2(y.principal)}</td><td className="num">{money2(y.insurance)}</td><td className="num">{money2(y.balance)}</td></tr>)}</tbody>
+            </table></div>
+          )}
+          {detail === 'mensuel' && (
+            <div className="dt-scroll tall"><table className="dt-table compact">
+              <thead><tr><th>Mois</th><th className="num">Échéance</th><th className="num">Intérêts</th><th className="num">Capital</th><th className="num">Assurance</th><th className="num">Restant dû</th></tr></thead>
+              <tbody>{r.amortization.map((m) => <tr key={m.month}><td>{m.month}{m.phase !== 'amortissement' ? ' (différé)' : ''}</td><td className="num">{money2(m.payment)}</td><td className="num">{money2(m.interest || m.capitalized)}</td><td className="num">{money2(m.principal)}</td><td className="num">{money2(m.insurance)}</td><td className="num">{money2(m.balance)}</td></tr>)}</tbody>
+            </table></div>
+          )}
+          {!detail && <p className="muted">{r.months} mensualités. Choisissez une vue par année ou par mois.</p>}
+        </Section>
+      )}
+
+      <details className="method">
+        <summary>Méthode de calcul</summary>
+        <ul>
+          <li>Coût total = prix hors honoraires + frais d’agence + frais de notaire + travaux + mobilier + garantie + dossier.</li>
+          <li>Frais de notaire en % : appliqués au prix hors honoraires d’agence (le prix proposé, ou le prix diminué des honoraires s’ils sont inclus).</li>
+          <li>Emprunt = coût total − apport (jamais négatif). Mensualité constante : capital × t / (1 − (1 + t)<sup>−n</sup>), t = taux annuel / 12 ; capital / n si le taux est nul.</li>
+          <li>Intérêts du mois = capital restant × t, arrondis au centime ; la dernière mensualité solde exactement le capital.</li>
+          <li>Assurance mensuelle = capital initial × taux annuel / 12, constante, due aussi pendant un différé.</li>
+          <li>Charges non récupérables = copropriété − part récupérable + taxe foncière − part récupérable + PNO + gestion + GLI + entretien + autres. Les provisions versées par le locataire sont supposées égales aux charges récupérables.</li>
+          <li>Rendement brut = loyers annuels / coût total. Rendement après charges = (loyers − vacance − charges non récupérables) / coût total.</li>
+          <li>Cash-flow avant fiscalité = loyers − vacance − charges non récupérables − mensualités et assurance (capital compris, car il sort de la trésorerie).</li>
+        </ul>
+      </details>
+    </>
+  );
+}
