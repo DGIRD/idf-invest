@@ -22,7 +22,7 @@ Même ordre qu'en test. Vérifiez le contrôle de comptage indiqué dans [MIGRAT
 ## 4. Publication
 
 1. GitHub → Settings → Pages → Source : **GitHub Actions** (aujourd'hui la publication se fait directement depuis la branche).
-2. Settings → Secrets and variables → Actions → **Variables** : `IMMOZEN_SUPABASE_URL`, `IMMOZEN_SUPABASE_ANON_KEY` (clé publique du projet de production).
+2. Projet Supabase : l'URL et la clé publique de production sont déjà dans `.github/workflows/deploy.yml` (reprises d'IDF Invest). Pour viser un autre projet, définissez les variables `IMMOZEN_SUPABASE_URL` et `IMMOZEN_SUPABASE_ANON_KEY` (Settings → Secrets and variables → Actions → Variables).
 3. Fusionnez la pull request. Le workflow « Déploiement » vérifie, construit et publie. Il refuse de publier sans projet Supabase configuré.
 4. Les utilisateurs ayant installé IDF Invest reçoivent la nouvelle version au prochain chargement (nouveau service worker). En cas d'affichage de l'ancienne version : recharger, ou réinstaller la PWA.
 5. Relancez `select * from immozen_backup.migrate_idf_invest();` pour reprendre les simulations créées entre la migration et la bascule.
