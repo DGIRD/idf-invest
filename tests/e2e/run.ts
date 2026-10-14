@@ -39,6 +39,7 @@ async function step(name: string, fn: () => Promise<void>) {
   } catch (e) {
     results.push({ name, ok: false, error: String(e) });
     console.log(`ÉCHEC ${name}\n     ${String(e).split('\n').slice(0, 4).join('\n     ')}`);
+    if (process.env.GITHUB_ACTIONS) console.log(`::error title=Test navigateur::${name} – ${String(e).split('\n').slice(0, 3).join(' ').replace(/\s+/g, ' ').slice(0, 400)}`);
   }
 }
 
