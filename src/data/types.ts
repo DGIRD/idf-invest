@@ -38,6 +38,8 @@ export interface Property extends Versioned {
   offer_price: number | null;
   works_budget: number | null;
   estimated_rent: number | null;
+  /** Provision mensuelle sur charges (biens détenus). */
+  charges_provision?: number | null;
   agency_id: string | null;
   agent_id: string | null;
   next_action: string | null;

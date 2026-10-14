@@ -53,6 +53,7 @@ export function describeError(e: unknown): string {
   if (/row-level security|permission denied/i.test(msg)) return 'Action refusée par le serveur (droits insuffisants).';
   if (/violates check constraint/i.test(msg)) return 'Une valeur ne respecte pas les règles de saisie.';
   if (/violates foreign key/i.test(msg)) return 'Élément lié introuvable (supprimé entre-temps ?).';
+  if (/schema cache/i.test(msg)) return `La base de données n’est pas à jour : une migration SQL reste à exécuter dans Supabase (${msg}).`;
   if (/Invalid login credentials/i.test(msg)) return 'E-mail ou mot de passe incorrect.';
   if (/Email not confirmed/i.test(msg)) return 'Adresse e-mail non confirmée : ouvrez le lien reçu par e-mail.';
   return msg;

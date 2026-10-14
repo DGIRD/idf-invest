@@ -208,9 +208,19 @@ async function main() {
     await page.goto(url + '#/biens');
     await page.getByRole('button', { name: 'Ajouter un bien détenu' }).first().click();
     await page.getByLabel('Titre *').fill('Parking détenu');
+    for (const absent of ['Lien de l’annonce', 'Prix affiché', 'Prix proposé', 'Budget travaux']) {
+      assert.equal(await page.getByLabel(absent).count(), 0, `champ absent : ${absent}`);
+    }
+    await page.getByRole('heading', { name: 'Loyer', exact: true }).waitFor();
+    await page.getByLabel('Loyer hors charges').fill('780');
+    await page.getByLabel('Provision sur charges').fill('45,50');
+    const cc = (await page.locator('output.computed').innerText()).replace(/[\u202f\u00a0]/g, ' ');
+    assert.match(cc, /825,50 €/, 'loyer charges comprises calculé');
     await page.getByLabel('Mode de détention').selectOption('nom_propre');
     await page.getByRole('button', { name: 'Enregistrer' }).first().click();
     await page.getByRole('heading', { name: 'Parking détenu' }).waitFor();
+    await page.getByText('Loyer charges comprises').waitFor();
+    assert.match((await page.locator('.kv').innerText()).replace(/[\u202f\u00a0]/g, ' '), /825,50 € \/ mois/);
     await page.goto(url + '#/biens');
     await page.getByRole('button', { name: 'Parking détenu' }).waitFor();
     await page.screenshot({ path: join(out, '06-mes-biens.png') });
