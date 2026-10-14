@@ -4,7 +4,7 @@ import type { Contact, Insert, Property, Scenario } from '../data/types.ts';
 import { downloadBlob, stamp, toCsv, toXlsx, type ExportColumn } from '../domain/exporting.ts';
 import { date, money, number, pct } from '../domain/format.ts';
 import { OCCUPATION_LABELS, OWNERSHIP_LABELS, STATUS_LABELS, TYPE_LABELS } from '../domain/labels.ts';
-import { metrics, summarize, type PropertyMetrics } from '../domain/property.ts';
+import { metrics, rentWithCharges, summarize, type PropertyMetrics } from '../domain/property.ts';
 import { normalizeInputs, simulate } from '../domain/simulator.ts';
 import type { Column } from '../ui/DataTable.tsx';
 import { StatusBadge } from '../ui/components.tsx';
@@ -76,7 +76,9 @@ export function ownedColumns(): Column<PropertyRow>[] {
       render: (r) => money(r.p.acquisition_cost ?? r.p.acquisition_snapshot?.results?.totalCost ?? null) },
     { id: 'occupation', label: 'Occupation', value: (r) => (r.p.occupation_status ? OCCUPATION_LABELS[r.p.occupation_status] : null), mobile: true },
     { id: 'tenant', label: 'Locataire actif', value: () => null, sortable: false, render: () => <span className="muted" title={lot2}>lot 2</span> },
-    { id: 'rent', label: 'Loyer', value: (r) => r.p.estimated_rent, kind: 'money', align: 'right', render: (r) => money(r.p.estimated_rent), mobile: true },
+    { id: 'rent', label: 'Loyer HC', value: (r) => r.p.estimated_rent, kind: 'money', align: 'right', render: (r) => money(r.p.estimated_rent) },
+    { id: 'provision', label: 'Provision charges', value: (r) => r.p.charges_provision ?? null, kind: 'money', align: 'right', render: (r) => money(r.p.charges_provision), defaultHidden: true },
+    { id: 'rentcc', label: 'Loyer CC', value: (r) => rentWithCharges(r.p), kind: 'money', align: 'right', render: (r) => money(rentWithCharges(r.p)), mobile: true },
     { id: 'received', label: 'Encaissements', value: () => null, sortable: false, render: () => <span className="muted" title={lot2}>lot 2</span>, defaultHidden: true },
     { id: 'expenses', label: 'Dépenses', value: () => null, sortable: false, render: () => <span className="muted" title={lot2}>lot 2</span>, defaultHidden: true },
     { id: 'balance', label: 'Solde locatif', value: () => null, sortable: false, render: () => <span className="muted" title={lot2}>lot 2</span>, defaultHidden: true },

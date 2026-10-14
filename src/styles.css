@@ -372,3 +372,6 @@ button, input, select, textarea { font: inherit; color: inherit; }
   .topbar, .sidenav, .toasts, .page-actions, .dt-toolbar, .dt-pager, .demo-banner { display: none !important; }
   .body { display: block; }
 }
+
+.computed { display: flex; align-items: baseline; gap: .3rem; min-height: 40px; padding: .5rem .65rem; border: 1px dashed var(--line-strong); border-radius: var(--radius); background: var(--paper); font-weight: 600; }
+.computed small { font-weight: 400; color: var(--ink-soft); }

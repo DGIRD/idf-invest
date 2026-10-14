@@ -34,6 +34,12 @@ export function metrics(p: Property, scenarios: Scenario[], defaults?: Simulatio
   return { pricePerM2: pricePerM2(p), scenario, result: scenarioResult(scenario, defaults) };
 }
 
+/** Loyer charges comprises = loyer hors charges + provision sur charges (mensuel). */
+export function rentWithCharges(p: { estimated_rent?: number | null; charges_provision?: number | null }): number | null {
+  if (p.estimated_rent == null && p.charges_provision == null) return null;
+  return Math.round(((p.estimated_rent ?? 0) + (p.charges_provision ?? 0)) * 100) / 100;
+}
+
 /** Pré-remplit un scénario à partir de la fiche du bien. */
 export function inputsFromProperty(p: Property, defaults: SimulationInputs): SimulationInputs {
   return {
@@ -41,6 +47,7 @@ export function inputsFromProperty(p: Property, defaults: SimulationInputs): Sim
     price: p.offer_price ?? p.asking_price ?? 0,
     works: p.works_budget ?? 0,
     monthlyRent: p.estimated_rent ?? 0,
+    chargesProvisionMonthly: p.charges_provision ?? defaults.chargesProvisionMonthly,
   };
 }
 

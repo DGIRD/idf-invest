@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
 import { useStore } from '../data/store.tsx';
 import type { Channel, Insert, PropertyStatus, PropertyTask, Scenario, TimelineEvent } from '../data/types.ts';
-import { date, dateTime, money, number, pct, todayParis } from '../domain/format.ts';
+import { date, dateTime, money, money2, number, pct, todayParis } from '../domain/format.ts';
 import { CHANNEL_LABELS, EVENT_LABELS, OCCUPATION_LABELS, OWNERSHIP_LABELS, STATUS_LABELS, STATUS_ORDER, TAX_REGIME_LABELS, TYPE_LABELS } from '../domain/labels.ts';
-import { isOwned, metrics, scenarioResult } from '../domain/property.ts';
+import { isOwned, metrics, rentWithCharges, scenarioResult } from '../domain/property.ts';
 import { normalizeInputs, simulate } from '../domain/simulator.ts';
 import { Button, EmptyState, KeyValue, NotAvailable, PageHeader, Section, StatusBadge, Tabs, TextInput, useConfirm } from '../ui/components.tsx';
 import { href, navigate } from '../ui/router.ts';
@@ -91,8 +91,14 @@ export function PropertyDetailPage({ id }: { id: string }) {
             <KeyValue items={[
               ['Adresse', [p.address, p.zip, p.city].filter(Boolean).join(' ') || '—'],
               ['DPE renseigné', p.dpe ?? 'Non renseigné'],
-              ['Budget travaux', money(p.works_budget)],
-              ['Loyer estimé', p.estimated_rent ? `${money(p.estimated_rent)} / mois` : '—'],
+              ...(owned ? [
+                ['Loyer hors charges', p.estimated_rent != null ? `${money2(p.estimated_rent)} / mois` : '—'],
+                ['Provision sur charges', p.charges_provision != null ? `${money2(p.charges_provision)} / mois` : '—'],
+                ['Loyer charges comprises', rentWithCharges(p) != null ? `${money2(rentWithCharges(p))} / mois` : '—'],
+              ] as [string, string][] : [
+                ['Budget travaux', money(p.works_budget)],
+                ['Loyer estimé', p.estimated_rent ? `${money(p.estimated_rent)} / mois` : '—'],
+              ] as [string, string][]),
               ['Agence', agency ? <a href={href(`/contacts/${agency.id}`)}>{agency.name}</a> : '—'],
               ['Agent', agent ? <a href={href(`/contacts/${agent.id}`)}>{agent.name}</a> : '—'],
               ...(owned ? [

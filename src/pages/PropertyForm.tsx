@@ -2,6 +2,8 @@ import { useMemo, useState, type FormEvent } from 'react';
 import { useStore } from '../data/store.tsx';
 import type { Contact, Insert, OccupationStatus, OwnershipMode, Property, PropertyStatus, PropertyType, TaxRegime } from '../data/types.ts';
 import { DPE_VALUES, OCCUPATION_LABELS, OWNERSHIP_LABELS, STATUS_LABELS, STATUS_ORDER, TAX_REGIME_LABELS, TYPE_LABELS } from '../domain/labels.ts';
+import { money2 } from '../domain/format.ts';
+import { rentWithCharges } from '../domain/property.ts';
 import { Button, NumberInput, PageHeader, Section, Select, TextArea, TextInput } from '../ui/components.tsx';
 import { navigate } from '../ui/router.ts';
 
@@ -33,12 +35,12 @@ export function PropertyFormPage({ id, mode }: { id?: string; mode: 'prospect' |
   function validate(): boolean {
     const e: Record<string, string> = {};
     if (!draft.title.trim()) e.title = 'Le titre est obligatoire.';
-    for (const k of ['surface', 'asking_price', 'offer_price', 'works_budget', 'estimated_rent', 'acquisition_cost', 'rooms'] as const) {
+    for (const k of ['surface', 'asking_price', 'offer_price', 'works_budget', 'estimated_rent', 'charges_provision', 'acquisition_cost', 'rooms'] as const) {
       const v = draft[k];
       if (v !== null && v !== undefined && (!Number.isFinite(v) || v < 0)) e[k] = 'Nombre positif attendu.';
     }
     if (draft.surface === 0) e.surface = 'La surface doit être supérieure à zéro.';
-    if (draft.listing_url && !/^https?:\/\//i.test(draft.listing_url)) e.listing_url = 'Adresse web commençant par http:// ou https://';
+    if (!owned && draft.listing_url && !/^https?:\/\//i.test(draft.listing_url)) e.listing_url = 'Adresse web commençant par http:// ou https://';
     if (agencyChoice === NEW && !newAgency.trim()) e.agency = 'Nom de l’agence à créer.';
     if (agentChoice === NEW && !newAgent.trim()) e.agent = 'Nom de l’agent à créer.';
     setErrors(e);
@@ -64,6 +66,8 @@ export function PropertyFormPage({ id, mode }: { id?: string; mode: 'prospect' |
       const { id: _i, user_id: _u, version: _v, created_at: _c, updated_at: _up, ...rest } = draft as Partial<Property>;
       const payload: Insert<Property> = { ...rest, title: draft.title.trim(), agency_id: agencyId, agent_id: agentId };
       if (!owned) { payload.occupation_status = null; }
+      // N'envoyer la provision que si elle est renseignée (compatibilité avec une base pas encore migrée)
+      if (payload.charges_provision === null || payload.charges_provision === undefined) delete payload.charges_provision;
       if (existing) {
         const row = await update('properties', existing, payload, `Le bien « ${existing.title} »`);
         if (row) navigate(`/bien/${row.id}`);
@@ -100,19 +104,33 @@ export function PropertyFormPage({ id, mode }: { id?: string; mode: 'prospect' |
           <NumberInput label="Surface" suffix="m²" value={draft.surface} onChange={(v) => set('surface', v)} error={errors.surface} />
           <NumberInput label="Pièces" value={draft.rooms} onChange={(v) => set('rooms', v === null ? null : Math.round(v))} error={errors.rooms} />
           <Select label="DPE renseigné" value={draft.dpe ?? null} onChange={(v) => set('dpe', v)} allowEmpty="Non renseigné" options={DPE_VALUES.map((d) => [d, d] as const)} />
-          <TextInput label="Lien de l’annonce" type="url" wide value={draft.listing_url} onChange={(v) => set('listing_url', v || null)} error={errors.listing_url} placeholder="https://" />
+          {!owned && <TextInput label="Lien de l’annonce" type="url" wide value={draft.listing_url} onChange={(v) => set('listing_url', v || null)} error={errors.listing_url} placeholder="https://" />}
         </div>
       </Section>
 
-      <Section title="Prix et loyer">
-        <div className="grid">
-          <NumberInput label="Prix affiché" suffix="€" value={draft.asking_price} onChange={(v) => set('asking_price', v)} error={errors.asking_price} />
-          <NumberInput label="Prix proposé" suffix="€" value={draft.offer_price} onChange={(v) => set('offer_price', v)} error={errors.offer_price} />
-          <NumberInput label="Budget travaux" suffix="€" value={draft.works_budget} onChange={(v) => set('works_budget', v)} error={errors.works_budget} />
-          <NumberInput label="Loyer estimé hors charges" suffix="€/mois" value={draft.estimated_rent} onChange={(v) => set('estimated_rent', v)} error={errors.estimated_rent} />
-        </div>
-        <p className="muted small">Ces valeurs pré-remplissent les nouvelles simulations. Rendement et cash-flow sont calculés dans le simulateur.</p>
-      </Section>
+      {owned ? (
+        <Section title="Loyer">
+          <div className="grid">
+            <NumberInput label="Loyer hors charges" suffix="€/mois" value={draft.estimated_rent} onChange={(v) => set('estimated_rent', v)} error={errors.estimated_rent} />
+            <NumberInput label="Provision sur charges" suffix="€/mois" value={draft.charges_provision} onChange={(v) => set('charges_provision', v)} error={errors.charges_provision} />
+            <div className="field">
+              <span className="label" id="loyer-cc">Loyer charges comprises</span>
+              <output className="computed" aria-labelledby="loyer-cc">{money2(rentWithCharges(draft))}<small> / mois</small></output>
+              <small className="muted">Calculé : loyer hors charges + provision.</small>
+            </div>
+          </div>
+        </Section>
+      ) : (
+        <Section title="Prix et loyer">
+          <div className="grid">
+            <NumberInput label="Prix affiché" suffix="€" value={draft.asking_price} onChange={(v) => set('asking_price', v)} error={errors.asking_price} />
+            <NumberInput label="Prix proposé" suffix="€" value={draft.offer_price} onChange={(v) => set('offer_price', v)} error={errors.offer_price} />
+            <NumberInput label="Budget travaux" suffix="€" value={draft.works_budget} onChange={(v) => set('works_budget', v)} error={errors.works_budget} />
+            <NumberInput label="Loyer estimé hors charges" suffix="€/mois" value={draft.estimated_rent} onChange={(v) => set('estimated_rent', v)} error={errors.estimated_rent} />
+          </div>
+          <p className="muted small">Ces valeurs pré-remplissent les nouvelles simulations. Rendement et cash-flow sont calculés dans le simulateur.</p>
+        </Section>
+      )}
 
       {owned && (
         <Section title="Détention">
