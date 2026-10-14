@@ -21,12 +21,18 @@ export interface Backup {
     tasks: PropertyTask[];
     events: TimelineEvent[];
   };
+  /** Gestion locative (lot 2) : exportée pour archivage ; la réimportation sera ajoutée ultérieurement. */
+  rental?: Pick<Snapshot, 'tenants' | 'leases' | 'leaseTenants' | 'charges' | 'payments' | 'allocations' | 'deposits' | 'receipts' | 'reminders' | 'documents' | 'expenses'>;
 }
 
 export function buildBackup(s: Snapshot, account: string, now = new Date()): Backup {
   return {
     format: BACKUP_FORMAT, version: BACKUP_VERSION, exported_at: now.toISOString(), account,
     data: { properties: s.properties, scenarios: s.scenarios, contacts: s.contacts, tasks: s.tasks, events: s.events },
+    rental: {
+      tenants: s.tenants, leases: s.leases, leaseTenants: s.leaseTenants, charges: s.charges, payments: s.payments, allocations: s.allocations,
+      deposits: s.deposits, receipts: s.receipts, reminders: s.reminders, documents: s.documents, expenses: s.expenses,
+    },
   };
 }
 

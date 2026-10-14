@@ -1,0 +1,5 @@
+# Configuration Supabase CLI (déploiement des fonctions serveur)
+[functions.daily]
+# La fonction est appelée par la planification avec son propre jeton (CRON_SECRET),
+# pas par un utilisateur connecté.
+verify_jwt = false

@@ -130,7 +130,7 @@ export function SettingsPage() {
           </label>
         </div>
         {importError && <p className="form-error" role="alert">{importError}</p>}
-        <p className="muted small">L’import affiche d’abord un aperçu ; les doublons (même bien, même contact) sont ignorés ; une sauvegarde de l’état actuel est téléchargée juste avant.</p>
+        <p className="muted small">L’import affiche d’abord un aperçu ; les doublons (même bien, même contact) sont ignorés ; une sauvegarde de l’état actuel est téléchargée juste avant. La sauvegarde contient aussi la gestion locative (baux, loyers, quittances, dépenses, fiches des documents) ; sa réimportation n’est pas encore disponible et les fichiers eux-mêmes restent dans le stockage.</p>
       </Section>
 
       <Section title="Données IDF Invest">
