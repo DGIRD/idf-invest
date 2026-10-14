@@ -8,12 +8,12 @@ declare global {
   }
 }
 
-const env = (typeof import.meta !== 'undefined' && import.meta.env) || { IMMOZEN_ENV: 'development', IMMOZEN_SUPABASE_URL: '', IMMOZEN_SUPABASE_ANON_KEY: '' };
-
+// Chaque valeur doit être écrite en entier (import.meta.env.NOM) : le build remplace
+// exactement ces expressions par leur valeur. Ne pas lire import.meta.env globalement.
 export const config = {
-  env: env.IMMOZEN_ENV as 'development' | 'test' | 'production',
-  supabaseUrl: env.IMMOZEN_SUPABASE_URL,
-  supabaseAnonKey: env.IMMOZEN_SUPABASE_ANON_KEY,
+  env: import.meta.env.IMMOZEN_ENV as 'development' | 'test' | 'production',
+  supabaseUrl: import.meta.env.IMMOZEN_SUPABASE_URL,
+  supabaseAnonKey: import.meta.env.IMMOZEN_SUPABASE_ANON_KEY,
 };
 
 /** Mode démonstration : aucun projet Supabase configuré, ou ?demo dans l'URL hors production. */
