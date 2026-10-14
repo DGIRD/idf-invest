@@ -6,7 +6,7 @@ import { buildBackup, materialize, parseBackup, planImport, type ImportPlan } fr
 import { downloadBlob, stamp } from '../domain/exporting.ts';
 import { dateTime } from '../domain/format.ts';
 import { legacyContacts, legacyInputs, legacyProperty, readLegacyLocal, type LegacySimulation } from '../domain/legacy.ts';
-import { DEFAULT_INPUTS, ENGINE_VERSION, normalizeInputs, type SimulationInputs } from '../domain/simulator.ts';
+import { DEFAULT_INPUTS, DEFAULT_SETTING_FIELDS, ENGINE_VERSION, type SimulationInputs } from '../domain/simulator.ts';
 import { Button, Modal, NumberInput, PageHeader, Section, TextArea, TextInput, useConfirm } from '../ui/components.tsx';
 import type { ReminderTemplate } from '../data/types.ts';
 import { DEFAULT_REMINDER_TEMPLATES, TEMPLATE_VARIABLES } from '../domain/rental.ts';
@@ -106,7 +106,7 @@ export function SettingsPage() {
 
       <Section title="Valeurs par défaut du simulateur" actions={<>
         <Button size="sm" onClick={() => setDefaults({ ...DEFAULT_INPUTS })}>Valeurs d’origine</Button>
-        <Button size="sm" variant="primary" onClick={async () => { if (await saveSettings({ simulator_defaults: normalizeInputs(defaults) })) notify('Valeurs par défaut enregistrées.'); }}>Enregistrer</Button>
+        <Button size="sm" variant="primary" onClick={async () => { const picked = Object.fromEntries(DEFAULT_SETTING_FIELDS.map((k) => [k, defaults[k]])); if (await saveSettings({ simulator_defaults: { ...picked, _v: 2 } as never })) notify('Valeurs par défaut enregistrées.'); }}>Enregistrer</Button>
       </>}>
         <p className="muted small">Utilisées pour toute nouvelle simulation. Les scénarios existants gardent leurs propres hypothèses.</p>
         <div className="grid">
@@ -115,6 +115,7 @@ export function SettingsPage() {
           {numField('interestRate', 'Taux du crédit', '% / an')}
           {numField('loanYears', 'Durée du crédit', 'ans')}
           {numField('insuranceRate', 'Assurance emprunteur', '% / an')}
+          {numField('pnoAnnual', 'Assurance PNO', '€ / an')}
         </div>
       </Section>
 

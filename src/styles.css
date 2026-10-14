@@ -402,3 +402,9 @@ button.figure { text-align: left; font: inherit; background: none; border: 0; bo
   .pdf-frame { height: 60vh; }
   button.figure { border-right: 0; border-bottom: 1px solid var(--line); }
 }
+
+/* Simulateur : choix du prix au m² */
+.rent-mode { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; margin-bottom: .8rem; }
+.rent-mode .label { margin-right: .4rem; }
+.seg { border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink); padding: .35rem .9rem; border-radius: 99px; cursor: pointer; font-weight: 600; }
+.seg.on { background: var(--sapin); border-color: var(--sapin); color: var(--surface); }

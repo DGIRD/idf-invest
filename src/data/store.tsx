@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { DEFAULT_INPUTS, normalizeInputs, type SimulationInputs } from '../domain/simulator.ts';
+import { userDefaults, type SimulationInputs } from '../domain/simulator.ts';
 import { describeError, EMPTY_SNAPSHOT, RepoError, SNAPSHOT_KEY, type Repo, type SessionInfo, type Snapshot } from './repo.ts';
 import type { Insert, Patch, Tables, TableName, UserSettings, VersionedTable } from './types.ts';
 
@@ -298,7 +298,7 @@ export function StoreProvider({ repo, children }: { repo: Repo; children: ReactN
     setSession(null);
   }, [repo]);
 
-  const simulatorDefaults = useMemo(() => normalizeInputs(data.settings?.simulator_defaults ?? {}, DEFAULT_INPUTS), [data.settings]);
+  const simulatorDefaults = useMemo(() => userDefaults(data.settings?.simulator_defaults as Record<string, unknown> | undefined), [data.settings]);
 
   const value: StoreValue = {
     repo, session, authReady, data, sync, conflict, toasts, simulatorDefaults,

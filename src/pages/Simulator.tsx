@@ -4,7 +4,7 @@ import type { Scenario } from '../data/types.ts';
 import { downloadBlob, stamp, toXlsx } from '../domain/exporting.ts';
 import { money, money2, pct } from '../domain/format.ts';
 import { inputsFromProperty } from '../domain/property.ts';
-import { ENGINE_VERSION, normalizeInputs, simulate, summarize, type FieldError, type SimulationInputs } from '../domain/simulator.ts';
+import { autoProvisionMonthly, autoRecoverableAnnual, ENGINE_VERSION, normalizeInputs, simulate, summarize, type FieldError, type SimulationInputs } from '../domain/simulator.ts';
 import { Button, Checkbox, NumberInput, PageHeader, Section, Select, TextInput } from '../ui/components.tsx';
 import { href, navigate } from '../ui/router.ts';
 
@@ -15,7 +15,13 @@ export function SimulatorPage({ scenarioId, propertyId }: { scenarioId?: string;
   const property = initialProperty ? data.properties.find((p) => p.id === initialProperty) : undefined;
 
   const initial = useMemo<SimulationInputs>(() => {
-    if (scenario) return normalizeInputs(scenario.inputs, simulatorDefaults);
+    if (scenario) {
+      const base = normalizeInputs(scenario.inputs, simulatorDefaults);
+      // champs ajoutés après l'enregistrement du scénario : repris du bien lié
+      if (property && !base.surface && property.surface) base.surface = property.surface;
+      if (property && !base.askingPrice && property.asking_price) base.askingPrice = property.asking_price;
+      return base;
+    }
     if (property) return inputsFromProperty(property, simulatorDefaults);
     return { ...simulatorDefaults };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -34,6 +40,15 @@ export function SimulatorPage({ scenarioId, propertyId }: { scenarioId?: string;
   const num = (k: keyof SimulationInputs, label: string, suffix: string, hint?: string) => (
     <NumberInput label={label} suffix={suffix} value={inputs[k] as number} onChange={(v) => set(k, (v ?? 0) as never)} error={err(k)} hint={hint} />
   );
+  // Charges de copropriété : part récupérable et provision proposées à 80 %, sauf si elles ont été modifiées à la main
+  const setCopro = (v: number | null) => setInputs((i) => {
+    const copro = v ?? 0;
+    const next = { ...i, coproChargesAnnual: copro };
+    if (!i.coproRecoverableAnnual || i.coproRecoverableAnnual === autoRecoverableAnnual(i.coproChargesAnnual)) next.coproRecoverableAnnual = autoRecoverableAnnual(copro);
+    if (!i.chargesProvisionMonthly || i.chargesProvisionMonthly === autoProvisionMonthly(i.coproChargesAnnual)) next.chargesProvisionMonthly = autoProvisionMonthly(copro);
+    return next;
+  });
+  const live = outcome.ok ? outcome.result : null;
   const dirty = JSON.stringify(inputs) !== JSON.stringify(initial) || name !== (scenario?.name ?? name) || linked !== initialProperty;
 
   async function save(asNew: boolean) {
@@ -102,10 +117,19 @@ export function SimulatorPage({ scenarioId, propertyId }: { scenarioId?: string;
 
           <Section title="Acquisition">
             <div className="grid">
+              {num('askingPrice', 'Prix de présentation FAI', '€', 'Prix affiché, frais d’agence inclus')}
+              {num('surface', 'Surface du logement', 'm²')}
               <Select label="Le prix proposé est" value={inputs.priceMode} onChange={(v) => set('priceMode', v ?? 'hors_honoraires')}
                 options={[['hors_honoraires', 'Hors honoraires'], ['honoraires_inclus', 'Honoraires inclus']] as const} />
               {num('price', 'Prix proposé', '€')}
               {num('agencyFees', inputs.priceMode === 'honoraires_inclus' ? 'Dont honoraires d’agence' : 'Frais d’agence', '€')}
+              <div className="field">
+                <span className="label" id="nego">Négociation</span>
+                <output className="computed" aria-labelledby="nego">
+                  {live?.negotiationAmount != null ? <>{money(live.negotiationAmount)}<small> soit {pct(live.negotiationPct)}</small></> : <small>Renseignez les deux prix</small>}
+                </output>
+                <small className="muted">Présentation FAI − prix proposé{inputs.priceMode === 'hors_honoraires' ? ' + frais d’agence' : ''} ({money(live?.offerFai)} FAI).</small>
+              </div>
               <Select label="Frais de notaire" value={inputs.notaryMode} onChange={(v) => set('notaryMode', v ?? 'percent')}
                 options={[['percent', 'En % du prix'], ['amount', 'Montant connu']] as const} />
               {inputs.notaryMode === 'percent' ? num('notaryRate', 'Taux frais de notaire', '%') : num('notaryAmount', 'Montant frais de notaire', '€')}
@@ -133,11 +157,30 @@ export function SimulatorPage({ scenarioId, propertyId }: { scenarioId?: string;
           </Section>
 
           <Section title="Loyers et charges">
+            <div className="rent-mode" role="radiogroup" aria-label="Loyer hors charges calculé avec">
+              <span className="label">Loyer calculé avec le prix au m²</span>
+              {([['bas', 'Bas'], ['haut', 'Haut'], ['manuel', 'Saisie libre']] as const).map(([k, l]) => (
+                <button key={k} type="button" role="radio" aria-checked={inputs.rentMode === k} className={`seg${inputs.rentMode === k ? ' on' : ''}`} onClick={() => set('rentMode', k)}>{l}</button>
+              ))}
+            </div>
             <div className="grid">
-              {num('monthlyRent', 'Loyer hors charges', '€ / mois')}
-              {num('chargesProvisionMonthly', 'Provisions sur charges', '€ / mois', 'Versées par le locataire')}
-              {num('coproChargesAnnual', 'Charges de copropriété', '€ / an')}
-              {num('coproRecoverableAnnual', 'dont récupérables', '€ / an')}
+              {num('rentM2Low', 'Loyer au m² bas', '€ / m²', 'Hors charges, par mois')}
+              {num('rentM2High', 'Loyer au m² haut', '€ / m²', 'Hors charges, par mois')}
+              {inputs.rentMode === 'manuel' ? num('monthlyRent', 'Loyer hors charges', '€ / mois') : (
+                <div className="field">
+                  <span className="label" id="rent-hc">Loyer hors charges</span>
+                  <output className="computed" aria-labelledby="rent-hc">{money2(live?.monthlyRent ?? 0)}<small> / mois</small></output>
+                  <small className="muted">{inputs.surface ? `${String(inputs.surface).replace('.', ',')} m² × ${String(inputs.rentMode === 'bas' ? inputs.rentM2Low : inputs.rentM2High).replace('.', ',')} € (prix ${inputs.rentMode})` : 'Renseignez la surface du logement.'}</small>
+                </div>
+              )}
+              {num('chargesProvisionMonthly', 'Provision sur charges', '€ / mois', 'Versée par le locataire ; proposée à 80 % des charges de copropriété')}
+              <div className="field">
+                <span className="label" id="rent-cc">Loyer charges comprises</span>
+                <output className="computed" aria-labelledby="rent-cc">{money2(live?.monthlyRentWithCharges ?? 0)}<small> / mois</small></output>
+                <small className="muted">Loyer hors charges + provision.</small>
+              </div>
+              <NumberInput label="Charges de copropriété" suffix="€ / an" value={inputs.coproChargesAnnual} onChange={setCopro} error={err('coproChargesAnnual')} />
+              {num('coproRecoverableAnnual', 'dont récupérables', '€ / an', 'Proposé à 80 % des charges de copropriété, modifiable')}
               {num('propertyTaxAnnual', 'Taxe foncière', '€ / an')}
               {num('propertyTaxRecoverableAnnual', 'dont part récupérable', '€ / an', 'Taxe d’enlèvement des ordures ménagères')}
               {num('pnoAnnual', 'Assurance PNO', '€ / an')}
@@ -165,6 +208,8 @@ export function SimulatorPage({ scenarioId, propertyId }: { scenarioId?: string;
                 {inputs.useLoan && inputs.deferralType !== 'aucun' && <span className="muted small">après le différé : {money(r.cashflowMonthlySteady)} / mois</span>}
               </div>
               <dl className="results">
+                {r.negotiationAmount !== null && <div><dt>Négociation</dt><dd>{money(r.negotiationAmount)} ({pct(r.negotiationPct)})</dd></div>}
+                {r.pricePerM2 !== null && <div><dt>Prix au m² (FAI)</dt><dd>{money(r.pricePerM2)}</dd></div>}
                 <div><dt>Coût total de l’opération</dt><dd>{money(r.totalCost)}</dd></div>
                 <div className="sub"><dt>Prix hors honoraires</dt><dd>{money(r.netPrice)}</dd></div>
                 <div className="sub"><dt>Frais de notaire</dt><dd>{money(r.notaryFees)}</dd></div>
@@ -178,6 +223,8 @@ export function SimulatorPage({ scenarioId, propertyId }: { scenarioId?: string;
                 <div className="sub"><dt>Intérêts</dt><dd>{money(r.totalInterest)}</dd></div>
                 <div className="sub"><dt>Assurance</dt><dd>{money(r.totalInsurance)}</dd></div>
                 <div className="sub"><dt>Garantie et dossier</dt><dd>{money(r.financingFees)}</dd></div>
+                <div><dt>Loyer hors charges</dt><dd>{money2(r.monthlyRent)} / mois</dd></div>
+                <div><dt>Loyer charges comprises</dt><dd>{money2(r.monthlyRentWithCharges)} / mois</dd></div>
                 <div><dt>Loyers annuels</dt><dd>{money(r.annualRent)}</dd></div>
                 <div><dt>Charges non récupérables</dt><dd>{money(r.annualOwnerCharges)}</dd></div>
                 <div><dt>Vacance</dt><dd>{money(r.annualVacancy)}</dd></div>
@@ -218,6 +265,9 @@ export function SimulatorPage({ scenarioId, propertyId }: { scenarioId?: string;
       <details className="method">
         <summary>Méthode de calcul</summary>
         <ul>
+          <li>Négociation = prix de présentation FAI − prix proposé exprimé frais d’agence inclus ; en % du prix de présentation.</li>
+          <li>Loyer hors charges = surface × loyer au m² (bas ou haut), ou montant saisi en « saisie libre ». Loyer charges comprises = loyer hors charges + provision.</li>
+          <li>Charges récupérables et provision proposées à 80 % des charges de copropriété (par an, et par mois), arrondies à l’euro supérieur ; modifiables.</li>
           <li>Coût total = prix hors honoraires + frais d’agence + frais de notaire + travaux + mobilier + garantie + dossier.</li>
           <li>Frais de notaire en % : appliqués au prix hors honoraires d’agence (le prix proposé, ou le prix diminué des honoraires s’ils sont inclus).</li>
           <li>Emprunt = coût total − apport (jamais négatif). Mensualité constante : capital × t / (1 − (1 + t)<sup>−n</sup>), t = taux annuel / 12 ; capital / n si le taux est nul.</li>

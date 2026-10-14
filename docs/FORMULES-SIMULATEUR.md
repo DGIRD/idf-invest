@@ -5,7 +5,19 @@ Résultats **avant fiscalité** : aucun impôt, amortissement comptable ni prél
 
 ## Paramètres par défaut (modifiables dans Paramètres)
 
-Frais de notaire 7,5 % · frais d'agence 10 000 € · crédit 3,5 % · 20 ans · assurance 0,3 % par an.
+Frais de notaire 7,5 % · frais d'agence 10 000 € · crédit 3,5 % · 20 ans · assurance 0,3 % par an · assurance PNO 99 € par an.
+
+## Négociation et prix au m²
+
+- **Prix proposé FAI** = prix proposé (mode « honoraires inclus ») ou prix proposé + frais d'agence (mode « hors honoraires »).
+- **Négociation** = prix de présentation FAI − prix proposé FAI ; en % du prix de présentation. Non calculée sans les deux prix ; avertissement si le prix proposé dépasse le prix de présentation.
+- **Prix au m²** = prix proposé FAI / surface.
+
+## Loyer
+
+- **Loyer hors charges** = surface × loyer au m² « bas » ou « haut » selon le sélecteur, arrondi au centime ; ou montant saisi en « saisie libre ». Les scénarios enregistrés avant cette version restent en saisie libre (loyer inchangé).
+- **Loyer charges comprises** = loyer hors charges + provision sur charges.
+- **Charges de copropriété** : la part récupérable (par an) et la provision (par mois) sont proposées à 80 % du montant, en euros entiers arrondis au supérieur (ex. 1 000 € → 800 €/an et 67 €/mois). Une valeur modifiée à la main n'est plus recalculée.
 
 ## Acquisition
 

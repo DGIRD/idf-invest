@@ -1,9 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DEFAULT_INPUTS, amortize, normalizeInputs, round2, simulate, type SimulationInputs, type SimulationResult } from '../src/domain/simulator.ts';
+import { DEFAULT_INPUTS, userDefaults, amortize, autoProvisionMonthly, autoRecoverableAnnual, normalizeInputs, round2, simulate, type SimulationInputs, type SimulationResult } from '../src/domain/simulator.ts';
 
 function run(over: Partial<SimulationInputs>): SimulationResult {
-  const out = simulate({ ...DEFAULT_INPUTS, ...over });
+  const out = simulate({ ...DEFAULT_INPUTS, rentMode: 'manuel', ...over });
   if (!out.ok) throw new Error('Erreurs inattendues : ' + JSON.stringify(out.errors));
   return out.result;
 }
@@ -15,6 +15,7 @@ test('valeurs par défaut demandées', () => {
   assert.equal(DEFAULT_INPUTS.interestRate, 3.5);
   assert.equal(DEFAULT_INPUTS.loanYears, 20);
   assert.equal(DEFAULT_INPUTS.insuranceRate, 0.3);
+  assert.equal(DEFAULT_INPUTS.pnoAnnual, 99);
 });
 
 test('mensualité de référence : 200 000 € à 3,5 % sur 20 ans = 1 159,92 €', () => {
@@ -140,4 +141,50 @@ test('arrondis au centime', () => {
   assert.equal(round2(1.005), 1.01);
   assert.equal(round2(-1.005), -1.01);
   assert.equal(round2(0.1 + 0.2), 0.3);
+});
+
+test('négociation : prix de présentation FAI comparé au prix proposé FAI, en montant et en %', () => {
+  const horsHonoraires = run({ askingPrice: 230000, price: 205000, agencyFees: 10000 });
+  assert.equal(horsHonoraires.offerFai, 215000);
+  assert.equal(horsHonoraires.negotiationAmount, 15000);
+  assert.equal(round2(horsHonoraires.negotiationPct!), 6.52);
+  const inclus = run({ priceMode: 'honoraires_inclus', askingPrice: 230000, price: 215000, agencyFees: 10000 });
+  assert.equal(inclus.negotiationAmount, 15000);
+  assert.equal(run({ price: 200000 }).negotiationAmount, null, 'sans prix de présentation, pas de négociation');
+  assert.ok(run({ askingPrice: 100000, price: 120000, agencyFees: 0 }).warnings.some((w) => w.includes('dépasse')));
+});
+
+test('loyer : surface × prix au m² bas ou haut, loyer charges comprises', () => {
+  const base = { surface: 42, rentM2Low: 22, rentM2High: 26.5, monthlyRent: 999, chargesProvisionMonthly: 60, price: 200000 };
+  const bas = run({ ...base, rentMode: 'bas' });
+  assert.equal(bas.monthlyRent, 924);
+  assert.equal(bas.annualRent, 11088);
+  assert.equal(bas.monthlyRentWithCharges, 984);
+  assert.equal(run({ ...base, rentMode: 'haut' }).monthlyRent, 1113);
+  assert.equal(run({ ...base, rentMode: 'manuel' }).monthlyRent, 999, 'saisie libre conservée');
+  const bad = simulate({ ...DEFAULT_INPUTS, ...base, rentMode: 'bas', rentM2Low: 30, rentM2High: 20 });
+  assert.ok(!bad.ok && bad.errors.some((e) => e.field === 'rentM2High'));
+});
+
+test('charges de copropriété : 80 % récupérables, arrondis à l’euro supérieur', () => {
+  assert.equal(autoRecoverableAnnual(1200), 960);
+  assert.equal(autoRecoverableAnnual(1001), 801, '800,80 arrondi à 801');
+  assert.equal(autoProvisionMonthly(1200), 80);
+  assert.equal(autoProvisionMonthly(1000), 67, '66,67 arrondi à 67');
+  assert.equal(autoProvisionMonthly(0), 0);
+});
+
+test('anciens scénarios : loyer saisi conservé, fourchette IDF Invest reprise', () => {
+  const i = normalizeInputs({ monthlyRent: 850, legacy: { rentM2Low: 20, rentM2High: 24 } } as never);
+  assert.equal(i.rentMode, 'manuel');
+  assert.equal(i.monthlyRent, 850);
+  assert.equal(i.rentM2Low, 20);
+  assert.equal(normalizeInputs({}).rentMode, 'bas', 'nouvelle simulation : loyer calculé au m²');
+});
+
+test('valeurs par défaut de l’utilisateur : PNO à 99 € sauf choix enregistré depuis son ajout', () => {
+  assert.equal(userDefaults({ notaryRate: 8, pnoAnnual: 0 }).pnoAnnual, 99, 'ancien enregistrement : 0 € ignoré');
+  assert.equal(userDefaults({ notaryRate: 8 }).notaryRate, 8);
+  assert.equal(userDefaults({ pnoAnnual: 120, _v: 2 }).pnoAnnual, 120);
+  assert.equal(userDefaults({ price: 5, _v: 2 }).price, 0, 'seuls les champs réglables sont repris');
 });

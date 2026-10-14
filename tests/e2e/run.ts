@@ -126,6 +126,32 @@ async function main() {
     await page.getByLabel('Durée').fill('20');
   });
 
+  await step('simulateur : négociation, loyer au m² bas/haut, charges de copropriété à 80 %', async () => {
+    await page.goto(url + '#/simulateur');
+    const val = async (label: string) => (await page.getByLabel(label, { exact: true }).inputValue());
+    const shown = async (id: string) => (await page.locator(`output[aria-labelledby="${id}"]`).innerText()).replace(/[\u202f\u00a0]/g, ' ');
+    assert.equal(await val('Assurance PNO'), '99', 'PNO à 99 € par défaut');
+    await page.getByLabel('Prix de présentation FAI').fill('250000');
+    await page.getByLabel('Surface du logement').fill('40');
+    await page.getByLabel('Prix proposé', { exact: true }).fill('220000');
+    const nego = await shown('nego');
+    assert.match(nego, /20 000 €\s*soit 8,00 %/, `négociation en montant et en % : ${nego}`);
+    await page.getByLabel('Loyer au m² bas').fill('20');
+    await page.getByLabel('Loyer au m² haut').fill('25');
+    assert.match(await shown('rent-hc'), /800,00 €/);
+    await page.getByRole('radio', { name: 'Haut' }).click();
+    assert.match(await shown('rent-hc'), /1 000,00 €/);
+    await page.getByLabel('Charges de copropriété').fill('1000');
+    assert.equal(await val('dont récupérables'), '800');
+    assert.equal(await val('Provision sur charges'), '67');
+    assert.match(await shown('rent-cc'), /1 067,00 €/, 'loyer charges comprises');
+    await page.getByLabel('Provision sur charges').fill('50');
+    await page.getByLabel('Charges de copropriété').fill('1200');
+    assert.equal(await val('dont récupérables'), '960', 'part récupérable recalculée');
+    assert.equal(await val('Provision sur charges'), '50', 'valeur modifiée à la main conservée');
+    await page.screenshot({ path: join(out, '19-simulateur-loyer-m2.png'), fullPage: true });
+  });
+
   await step('tableau prospection : rendement, cash-flow, relance', async () => {
     await page.goto(url + '#/prospection');
     const row = page.locator('tbody tr', { hasText: 'T3 test balcon' });
@@ -214,8 +240,12 @@ async function main() {
     await page.getByRole('heading', { name: 'Loyer', exact: true }).waitFor();
     await page.getByLabel('Loyer hors charges').fill('780');
     await page.getByLabel('Provision sur charges').fill('45,50');
-    const cc = (await page.locator('output.computed').innerText()).replace(/[\u202f\u00a0]/g, ' ');
+    const cc = (await page.locator('output[aria-labelledby="loyer-cc"]').innerText()).replace(/[\u202f\u00a0]/g, ' ');
     assert.match(cc, /825,50 €/, 'loyer charges comprises calculé');
+    await page.getByLabel('Taxe foncière').fill('900');
+    await page.getByLabel('Charges de copropriété').fill('1200');
+    await page.getByLabel('Assurance PNO').fill('99');
+    assert.match((await page.locator('output[aria-labelledby="charges-total"]').innerText()).replace(/[\u202f\u00a0]/g, ' '), /2 199,00 €/, 'total des charges annuelles');
     await page.getByLabel('Mode de détention').selectOption('nom_propre');
     await page.getByRole('button', { name: 'Enregistrer' }).first().click();
     await page.getByRole('heading', { name: 'Parking détenu' }).waitFor();

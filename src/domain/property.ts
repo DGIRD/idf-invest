@@ -1,5 +1,5 @@
 import type { AcquisitionSnapshot, Property, Scenario } from '../data/types.ts';
-import { normalizeInputs, simulate, summarize, type SimulationInputs, type SimulationResult } from './simulator.ts';
+import { autoProvisionMonthly, autoRecoverableAnnual, normalizeInputs, simulate, summarize, type SimulationInputs, type SimulationResult } from './simulator.ts';
 import { todayParis } from './format.ts';
 
 export const isOwned = (p: Pick<Property, 'status'>) => p.status === 'acquis';
@@ -40,14 +40,42 @@ export function rentWithCharges(p: { estimated_rent?: number | null; charges_pro
   return Math.round(((p.estimated_rent ?? 0) + (p.charges_provision ?? 0)) * 100) / 100;
 }
 
+/** Charges annuelles saisies sur un bien détenu. */
+export const ANNUAL_CHARGE_FIELDS = [
+  ['property_tax_annual', 'Taxe foncière'],
+  ['copro_charges_annual', 'Charges de copropriété'],
+  ['pno_annual', 'Assurance PNO'],
+  ['management_annual', 'Gestion locative'],
+  ['gli_annual', 'GLI'],
+  ['other_charges_annual', 'Autres charges'],
+] as const;
+export type AnnualChargeField = (typeof ANNUAL_CHARGE_FIELDS)[number][0];
+
+export function annualChargesTotal(p: Partial<Record<AnnualChargeField, number | null>>): number | null {
+  const vals = ANNUAL_CHARGE_FIELDS.map(([k]) => p[k]).filter((v): v is number => v !== null && v !== undefined);
+  return vals.length ? Math.round(vals.reduce((a, v) => a + v, 0) * 100) / 100 : null;
+}
+
 /** Pré-remplit un scénario à partir de la fiche du bien. */
 export function inputsFromProperty(p: Property, defaults: SimulationInputs): SimulationInputs {
+  const v = (x: number | null | undefined, d: number) => (x === null || x === undefined ? d : x);
   return {
     ...defaults,
+    askingPrice: p.asking_price ?? 0,
+    surface: p.surface ?? 0,
     price: p.offer_price ?? p.asking_price ?? 0,
     works: p.works_budget ?? 0,
+    // un loyer connu est repris tel quel ; sinon il est calculé au m²
+    rentMode: p.estimated_rent ? 'manuel' : defaults.rentMode,
     monthlyRent: p.estimated_rent ?? 0,
-    chargesProvisionMonthly: p.charges_provision ?? defaults.chargesProvisionMonthly,
+    chargesProvisionMonthly: v(p.charges_provision, p.copro_charges_annual ? autoProvisionMonthly(p.copro_charges_annual) : defaults.chargesProvisionMonthly),
+    coproRecoverableAnnual: p.copro_charges_annual ? autoRecoverableAnnual(p.copro_charges_annual) : defaults.coproRecoverableAnnual,
+    propertyTaxAnnual: v(p.property_tax_annual, defaults.propertyTaxAnnual),
+    coproChargesAnnual: v(p.copro_charges_annual, defaults.coproChargesAnnual),
+    pnoAnnual: v(p.pno_annual, defaults.pnoAnnual),
+    managementAnnual: v(p.management_annual, defaults.managementAnnual),
+    gliAnnual: v(p.gli_annual, defaults.gliAnnual),
+    otherChargesAnnual: v(p.other_charges_annual, defaults.otherChargesAnnual),
   };
 }
 
