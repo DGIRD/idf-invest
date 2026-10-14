@@ -100,6 +100,12 @@ if (serve) {
   const js = outputs.find((f) => f.startsWith('app-') && f.endsWith('.js'));
   const css = outputs.find((f) => f.startsWith('app-') && f.endsWith('.css'));
   writeShell(js, css);
+  // Garde-fou : la configuration doit réellement figurer dans le script livré.
+  const bundle = readFileSync(join(out, 'assets', js), 'utf8');
+  if (/import\.meta\.env/.test(bundle)) throw new Error('import.meta.env non remplacé dans le script livré.');
+  if (env.IMMOZEN_SUPABASE_URL && !bundle.includes(env.IMMOZEN_SUPABASE_URL)) {
+    throw new Error('L’URL Supabase n’est pas intégrée au script livré : l’application tournerait en mode démonstration.');
+  }
   const statics = ['./', 'index.html', 'manifest.webmanifest', ...readdirSync(join(out)).filter((f) => f.endsWith('.png')), `assets/${js}`, ...(css ? [`assets/${css}`] : [])];
   const version = createHash('sha256').update(statics.join('|') + js).digest('hex').slice(0, 12);
   writeServiceWorker(statics, version);
