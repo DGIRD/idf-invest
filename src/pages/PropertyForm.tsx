@@ -3,7 +3,7 @@ import { useStore } from '../data/store.tsx';
 import type { Contact, Insert, OccupationStatus, OwnershipMode, Property, PropertyStatus, PropertyType, TaxRegime } from '../data/types.ts';
 import { DPE_VALUES, OCCUPATION_LABELS, OWNERSHIP_LABELS, STATUS_LABELS, STATUS_ORDER, TAX_REGIME_LABELS, TYPE_LABELS } from '../domain/labels.ts';
 import { money2 } from '../domain/format.ts';
-import { rentWithCharges } from '../domain/property.ts';
+import { ANNUAL_CHARGE_FIELDS, annualChargesTotal, rentWithCharges } from '../domain/property.ts';
 import { Button, NumberInput, PageHeader, Section, Select, TextArea, TextInput } from '../ui/components.tsx';
 import { navigate } from '../ui/router.ts';
 
@@ -35,7 +35,7 @@ export function PropertyFormPage({ id, mode }: { id?: string; mode: 'prospect' |
   function validate(): boolean {
     const e: Record<string, string> = {};
     if (!draft.title.trim()) e.title = 'Le titre est obligatoire.';
-    for (const k of ['surface', 'asking_price', 'offer_price', 'works_budget', 'estimated_rent', 'charges_provision', 'acquisition_cost', 'rooms'] as const) {
+    for (const k of ['surface', 'asking_price', 'offer_price', 'works_budget', 'estimated_rent', 'charges_provision', 'acquisition_cost', 'rooms', ...ANNUAL_CHARGE_FIELDS.map(([f]) => f)] as const) {
       const v = draft[k];
       if (v !== null && v !== undefined && (!Number.isFinite(v) || v < 0)) e[k] = 'Nombre positif attendu.';
     }
@@ -67,7 +67,7 @@ export function PropertyFormPage({ id, mode }: { id?: string; mode: 'prospect' |
       const payload: Insert<Property> = { ...rest, title: draft.title.trim(), agency_id: agencyId, agent_id: agentId };
       if (!owned) { payload.occupation_status = null; }
       // N'envoyer la provision que si elle est renseignée (compatibilité avec une base pas encore migrée)
-      if (payload.charges_provision === null || payload.charges_provision === undefined) delete payload.charges_provision;
+      for (const k of ['charges_provision', ...ANNUAL_CHARGE_FIELDS.map(([f]) => f)] as const) if (payload[k] === null || payload[k] === undefined) delete payload[k];
       if (existing) {
         const row = await update('properties', existing, payload, `Le bien « ${existing.title} »`);
         if (row) navigate(`/bien/${row.id}`);
@@ -119,6 +119,23 @@ export function PropertyFormPage({ id, mode }: { id?: string; mode: 'prospect' |
               <small className="muted">Calculé : loyer hors charges + provision.</small>
             </div>
           </div>
+        </Section>
+      ) : null}
+
+      {owned ? (
+        <Section title="Charges annuelles">
+          <div className="grid">
+            {ANNUAL_CHARGE_FIELDS.map(([k, label]) => (
+              <NumberInput key={k} label={label} suffix="€/an" value={draft[k] ?? null} onChange={(v) => set(k, v)} error={errors[k]}
+                hint={k === 'management_annual' ? 'Honoraires de l’agence ou de l’administrateur de biens.' : k === 'gli_annual' ? 'Garantie loyers impayés.' : undefined} />
+            ))}
+            <div className="field">
+              <span className="label" id="charges-total">Total des charges</span>
+              <output className="computed" aria-labelledby="charges-total">{money2(annualChargesTotal(draft) ?? 0)}<small> / an</small></output>
+              <small className="muted">Soit {money2((annualChargesTotal(draft) ?? 0) / 12)} par mois.</small>
+            </div>
+          </div>
+          <p className="muted small">Ces montants pré-remplissent les simulations du bien. Les dépenses réellement payées se saisissent dans Dépenses.</p>
         </Section>
       ) : (
         <Section title="Prix et loyer">

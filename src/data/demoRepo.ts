@@ -35,7 +35,7 @@ function emptyDb(): Db {
 const PROPERTY_DEFAULTS: Omit<Property, 'id' | 'user_id' | 'version' | 'created_at' | 'updated_at' | 'title'> = {
   status: 'repere', status_before_archive: null, occupation_status: null, property_type: 'appartement',
   address: null, zip: null, city: null, surface: null, rooms: null, dpe: null, listing_url: null,
-  asking_price: null, offer_price: null, works_budget: null, estimated_rent: null, charges_provision: null, agency_id: null, agent_id: null,
+  asking_price: null, offer_price: null, works_budget: null, estimated_rent: null, charges_provision: null, property_tax_annual: null, copro_charges_annual: null, pno_annual: null, management_annual: null, gli_annual: null, other_charges_annual: null, agency_id: null, agent_id: null,
   next_action: null, follow_up_date: null, visit_at: null, comments: null, vigilance: [], ownership_mode: null,
   tax_regime: null, acquired_at: null, acquisition_cost: null, acquisition_snapshot: null, primary_scenario_id: null,
   legacy_simulation_id: null, legacy_ref: null,

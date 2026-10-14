@@ -19,7 +19,7 @@ export async function loadSampleData(store: Store) {
   for (const p of props) {
     const row = await store.create('properties', { ...p, agency_id: agency?.id ?? null, agent_id: agent?.id ?? null });
     if (!row) continue;
-    const inputs: SimulationInputs = { ...DEFAULT_INPUTS, price: p.offer_price ?? p.asking_price, works: p.works_budget ?? 0, monthlyRent: p.estimated_rent, downPayment: 20000, pnoAnnual: 150, propertyTaxAnnual: 900, coproChargesAnnual: 1200, coproRecoverableAnnual: 700, chargesProvisionMonthly: 60, vacancyAnnual: p.estimated_rent / 2 };
+    const inputs: SimulationInputs = { ...DEFAULT_INPUTS, rentMode: 'manuel', surface: p.surface, askingPrice: p.asking_price, price: p.offer_price ?? p.asking_price, works: p.works_budget ?? 0, monthlyRent: p.estimated_rent, downPayment: 20000, pnoAnnual: 150, propertyTaxAnnual: 900, coproChargesAnnual: 1200, coproRecoverableAnnual: 700, chargesProvisionMonthly: 60, vacancyAnnual: p.estimated_rent / 2 };
     const out = simulate(inputs);
     const sc = await store.create('scenarios', { property_id: row.id, name: 'Hypothèse de base', inputs, results: out.ok ? summarize(out.result) : null, engine_version: ENGINE_VERSION });
     if (sc) await store.update('properties', row, { primary_scenario_id: sc.id });

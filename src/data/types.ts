@@ -40,6 +40,13 @@ export interface Property extends Versioned {
   estimated_rent: number | null;
   /** Provision mensuelle sur charges (biens détenus). */
   charges_provision?: number | null;
+  /** Charges annuelles d'un bien détenu (€/an). */
+  property_tax_annual?: number | null;
+  copro_charges_annual?: number | null;
+  pno_annual?: number | null;
+  management_annual?: number | null;
+  gli_annual?: number | null;
+  other_charges_annual?: number | null;
   agency_id: string | null;
   agent_id: string | null;
   next_action: string | null;

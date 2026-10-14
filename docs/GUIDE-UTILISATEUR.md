@@ -22,11 +22,13 @@ Bouton **Marquer comme acquis** (ou statut « Acquis »). Après confirmation, l
 
 ## Mes biens
 
-Les biens détenus, acquis depuis la prospection ou ajoutés directement (**Ajouter un bien détenu**) : mode de détention, régime fiscal renseigné, date et coût d'acquisition, occupation. Voir plus bas « Mes biens » pour le suivi locatif.
+Les biens détenus, acquis depuis la prospection ou ajoutés directement (**Ajouter un bien détenu**) : mode de détention, régime fiscal renseigné, date et coût d'acquisition, occupation, loyer et provision, et **charges annuelles** (taxe foncière, copropriété, assurance PNO, gestion locative, GLI, autres) avec leur total ; elles pré-remplissent les simulations du bien. Voir plus bas « Mes biens » pour le suivi locatif.
 
 ## Simulateur
 
 Accessible seul ou depuis un bien (pré-rempli avec prix, travaux et loyer estimé). Les résultats se mettent à jour à chaque saisie. Indiquez si le prix inclut les honoraires d'agence pour éviter de les compter deux fois. Enregistrez plusieurs scénarios par bien ; le premier devient le **scénario principal** (modifiable dans l'onglet Simulations de la fiche), utilisé dans les tableaux et la comparaison. Le tableau d'amortissement s'affiche par année ou par mois et s'exporte en Excel. « Méthode de calcul » détaille les formules. Les valeurs par défaut se règlent dans **Paramètres**.
+
+Le **prix de présentation FAI** permet de calculer la négociation (en euros et en %) par rapport au prix proposé, frais d'agence compris. Le **loyer hors charges** se calcule à partir de la surface et d'un loyer au m² **bas** ou **haut** (sélecteur), ou se saisit librement ; le **loyer charges comprises** y ajoute la provision. En saisissant les charges de copropriété, la part récupérable et la provision sont proposées à 80 % (arrondies à l'euro supérieur) et restent modifiables. L'assurance PNO est proposée à 99 € par an.
 
 Les résultats sont avant impôts et ne constituent pas un conseil financier.
 

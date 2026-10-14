@@ -9,9 +9,15 @@ export const ENGINE_VERSION = '1';
 export type PriceMode = 'hors_honoraires' | 'honoraires_inclus';
 export type NotaryMode = 'percent' | 'amount';
 export type DeferralType = 'aucun' | 'partiel' | 'total';
+/** Loyer hors charges : surface × prix au m² bas ou haut, ou montant saisi. */
+export type RentMode = 'bas' | 'haut' | 'manuel';
 
 export interface SimulationInputs {
   priceMode: PriceMode;
+  /** Prix de présentation, frais d'agence inclus (FAI). Sert au calcul de la négociation. */
+  askingPrice: number;
+  /** Surface habitable du logement (m²). */
+  surface: number;
   /** Prix proposé. En mode « honoraires inclus », il contient les frais d'agence. */
   price: number;
   agencyFees: number;
@@ -33,6 +39,11 @@ export interface SimulationInputs {
   insuranceRate: number;
   deferralMonths: number;
   deferralType: DeferralType;
+  rentMode: RentMode;
+  /** Loyer au m² (hors charges, par mois), fourchette basse et haute. */
+  rentM2Low: number;
+  rentM2High: number;
+  /** Loyer hors charges saisi (mode « manuel ») ; sinon calculé. */
   monthlyRent: number;
   chargesProvisionMonthly: number;
   coproChargesAnnual: number;
@@ -48,7 +59,7 @@ export interface SimulationInputs {
 }
 
 export const NUMERIC_FIELDS = [
-  'price', 'agencyFees', 'notaryRate', 'notaryAmount', 'works', 'furniture', 'guaranteeFees', 'dossierFees',
+  'askingPrice', 'surface', 'rentM2Low', 'rentM2High', 'price', 'agencyFees', 'notaryRate', 'notaryAmount', 'works', 'furniture', 'guaranteeFees', 'dossierFees',
   'downPayment', 'interestRate', 'loanYears', 'insuranceRate', 'deferralMonths', 'monthlyRent',
   'chargesProvisionMonthly', 'coproChargesAnnual', 'coproRecoverableAnnual', 'propertyTaxAnnual',
   'propertyTaxRecoverableAnnual', 'pnoAnnual', 'managementAnnual', 'gliAnnual', 'maintenanceAnnual',
@@ -59,6 +70,8 @@ export type NumericField = (typeof NUMERIC_FIELDS)[number];
 /** Paramètres par défaut demandés (modifiables dans Paramètres). */
 export const DEFAULT_INPUTS: SimulationInputs = {
   priceMode: 'hors_honoraires',
+  askingPrice: 0,
+  surface: 0,
   price: 0,
   agencyFees: 10000,
   notaryMode: 'percent',
@@ -75,19 +88,40 @@ export const DEFAULT_INPUTS: SimulationInputs = {
   insuranceRate: 0.3,
   deferralMonths: 0,
   deferralType: 'aucun',
+  rentMode: 'bas',
+  rentM2Low: 0,
+  rentM2High: 0,
   monthlyRent: 0,
   chargesProvisionMonthly: 0,
   coproChargesAnnual: 0,
   coproRecoverableAnnual: 0,
   propertyTaxAnnual: 0,
   propertyTaxRecoverableAnnual: 0,
-  pnoAnnual: 0,
+  pnoAnnual: 99,
   managementAnnual: 0,
   gliAnnual: 0,
   maintenanceAnnual: 0,
   vacancyAnnual: 0,
   otherChargesAnnual: 0,
 };
+
+/** Valeurs par défaut réglables dans Paramètres. */
+export const DEFAULT_SETTING_FIELDS = ['notaryRate', 'agencyFees', 'interestRate', 'loanYears', 'insuranceRate', 'pnoAnnual'] as const;
+
+/**
+ * Valeurs par défaut de l'utilisateur. Seuls les champs réglables sont repris ; l'assurance PNO
+ * n'est reprise que si elle a été enregistrée depuis son ajout (format 2), pour ne pas imposer
+ * 0 € aux comptes qui avaient enregistré leurs valeurs auparavant.
+ */
+export function userDefaults(saved: Record<string, unknown> | null | undefined): SimulationInputs {
+  const s = saved ?? {};
+  const picked: Record<string, unknown> = {};
+  for (const k of DEFAULT_SETTING_FIELDS) {
+    if (k === 'pnoAnnual' && s._v !== 2) continue;
+    if (s[k] !== undefined) picked[k] = s[k];
+  }
+  return normalizeInputs(picked, DEFAULT_INPUTS);
+}
 
 /** Arrondi commercial au centime (demi vers l'infini), robuste aux erreurs binaires. */
 export function round2(x: number): number {
@@ -117,7 +151,35 @@ export function normalizeInputs(partial: Partial<Record<keyof SimulationInputs, 
   if (p.notaryMode === 'percent' || p.notaryMode === 'amount') out.notaryMode = p.notaryMode;
   if (p.deferralType === 'aucun' || p.deferralType === 'partiel' || p.deferralType === 'total') out.deferralType = p.deferralType;
   if (typeof p.useLoan === 'boolean') out.useLoan = p.useLoan;
+  if (p.rentMode === 'bas' || p.rentMode === 'haut' || p.rentMode === 'manuel') out.rentMode = p.rentMode;
+  // Scénario enregistré avant l'ajout du loyer au m² : le loyer saisi est conservé tel quel.
+  else if (p.monthlyRent !== undefined) out.rentMode = 'manuel';
+  // Fourchette de loyer au m² héritée d'IDF Invest
+  const legacy = (p as { legacy?: { rentM2Low?: unknown; rentM2High?: unknown } }).legacy;
+  if (legacy && p.rentM2Low === undefined && typeof legacy.rentM2Low === 'number') out.rentM2Low = legacy.rentM2Low;
+  if (legacy && p.rentM2High === undefined && typeof legacy.rentM2High === 'number') out.rentM2High = legacy.rentM2High;
   return out;
+}
+
+/** Loyer hors charges mensuel retenu (surface × prix au m², ou montant saisi). */
+export function effectiveRent(i: Pick<SimulationInputs, 'rentMode' | 'surface' | 'rentM2Low' | 'rentM2High' | 'monthlyRent'>): number {
+  if (i.rentMode === 'bas') return round2(i.surface * i.rentM2Low);
+  if (i.rentMode === 'haut') return round2(i.surface * i.rentM2High);
+  return round2(i.monthlyRent);
+}
+
+/** Valeurs proposées à partir des charges de copropriété : 80 % récupérables, en euros entiers arrondis au supérieur. */
+export const RECOVERABLE_SHARE = 0.8;
+export function autoRecoverableAnnual(coproAnnual: number): number {
+  return coproAnnual > 0 ? Math.ceil(round2(coproAnnual * RECOVERABLE_SHARE)) : 0;
+}
+export function autoProvisionMonthly(coproAnnual: number): number {
+  return coproAnnual > 0 ? Math.ceil(round2((coproAnnual * RECOVERABLE_SHARE) / 12)) : 0;
+}
+
+/** Prix proposé exprimé frais d'agence inclus, comparable au prix de présentation FAI. */
+export function offerFai(i: Pick<SimulationInputs, 'priceMode' | 'price' | 'agencyFees'>): number {
+  return round2(i.priceMode === 'honoraires_inclus' ? i.price : i.price + i.agencyFees);
 }
 
 export interface FieldError {
@@ -151,6 +213,9 @@ export function validateInputs(i: SimulationInputs): FieldError[] {
         errors.push({ field: 'deferralMonths', message: 'Le différé doit être plus court que la durée du prêt.' });
       }
     }
+  }
+  if (i.rentMode !== 'manuel' && i.rentM2Low > 0 && i.rentM2High > 0 && i.rentM2Low > i.rentM2High) {
+    errors.push({ field: 'rentM2High', message: 'Le loyer au m² haut doit être supérieur ou égal au bas.' });
   }
   if (i.coproRecoverableAnnual > i.coproChargesAnnual) {
     errors.push({ field: 'coproRecoverableAnnual', message: 'La part récupérable dépasse les charges de copropriété.' });
@@ -237,6 +302,16 @@ export function yearlySummary(rows: AmortizationRow[]): AmortizationYear[] {
 }
 
 export interface SimulationResult {
+  // négociation
+  offerFai: number;
+  /** Prix de présentation FAI − prix proposé FAI (positif = rabais obtenu). */
+  negotiationAmount: number | null;
+  /** En % du prix de présentation FAI. */
+  negotiationPct: number | null;
+  pricePerM2: number | null;
+  // loyer
+  monthlyRent: number;
+  monthlyRentWithCharges: number;
   // acquisition
   netPrice: number;
   notaryBase: number;
@@ -313,7 +388,13 @@ export function simulate(inputs: SimulationInputs): SimulationOutcome {
   const totalInsurance = round2(amortization.reduce((a, r) => a + r.insurance, 0));
   const financingCost = round2(totalInterest + totalInsurance + financingFees);
 
-  const annualRent = round2(i.monthlyRent * 12);
+  const monthlyRent = effectiveRent(i);
+  const monthlyRentWithCharges = round2(monthlyRent + i.chargesProvisionMonthly);
+  const fai = offerFai(i);
+  const negotiationAmount = i.askingPrice > 0 && i.price > 0 ? round2(i.askingPrice - fai) : null;
+  const negotiationPct = negotiationAmount !== null ? (negotiationAmount / i.askingPrice) * 100 : null;
+  const pricePerM2 = i.surface > 0 && i.price > 0 ? round2(fai / i.surface) : null;
+  const annualRent = round2(monthlyRent * 12);
   const ownerChargesDetail = [
     { label: 'Copropriété non récupérable', amount: round2(i.coproChargesAnnual - i.coproRecoverableAnnual) },
     { label: 'Taxe foncière non récupérable', amount: round2(i.propertyTaxAnnual - i.propertyTaxRecoverableAnnual) },
@@ -341,12 +422,14 @@ export function simulate(inputs: SimulationInputs): SimulationOutcome {
   if (Math.abs(provisions - recoverable) > Math.max(50, recoverable * 0.1)) {
     warnings.push(`Provisions sur charges (${round2(provisions)} €/an) éloignées des charges récupérables (${round2(recoverable)} €/an) : une régularisation annuelle sera à prévoir.`);
   }
-  if (i.monthlyRent === 0) warnings.push('Loyer non renseigné : rendements et cash-flow non significatifs.');
+  if (monthlyRent === 0) warnings.push(i.rentMode === 'manuel' ? 'Loyer non renseigné : rendements et cash-flow non significatifs.' : 'Renseignez la surface et le loyer au m² pour calculer le loyer.');
+  if (negotiationAmount !== null && negotiationAmount < 0) warnings.push('Le prix proposé dépasse le prix de présentation.');
   if (i.price === 0) warnings.push('Prix non renseigné.');
 
   return {
     ok: true,
     result: {
+      offerFai: fai, negotiationAmount, negotiationPct, pricePerM2, monthlyRent, monthlyRentWithCharges,
       netPrice, notaryBase, notaryFees, agencyFees: round2(i.agencyFees), totalCost, equity, unusedDownPayment,
       loanAmount, months, monthlyPayment, monthlyInsurance, monthlyPaymentWithInsurance: round2(monthlyPayment + monthlyInsurance),
       totalInterest, totalInsurance, financingFees, financingCost, amortization, years,

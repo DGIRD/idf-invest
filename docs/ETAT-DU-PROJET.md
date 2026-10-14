@@ -63,6 +63,7 @@ Légende : **Implémenté et testé** = code livré et couvert par un test autom
 ## Limites connues
 
 ### Lot 2
+- Migrations complémentaires du 14/10 à exécuter si ce n'est pas fait : `20261014000100_property_charges_provision.sql` (provision sur charges) et `20261014000300_property_annual_charges.sql` (charges annuelles de Mes biens). Sans elles, un bien dont ces champs sont renseignés ne peut pas être enregistré.
 - **Migration SQL à exécuter** : `supabase/migrations/20261014000200_lot2_gestion_locative.sql`. Tant qu'elle ne l'est pas, l'application fonctionne pour le lot 1 et affiche un bandeau « Mise à jour de la base requise ».
 - **E-mails non envoyés** tant que la fonction `daily`, la planification et un fournisseur (Resend) ne sont pas configurés ([TACHES-SERVEUR](TACHES-SERVEUR.md)). Les messages restent en file, visibles comme « envoi en attente ».
 - Ni la fonction serveur ni le stockage Supabase n'ont pu être exécutés pendant le développement : leur logique est testée, pas leur déploiement.

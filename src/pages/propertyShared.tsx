@@ -4,7 +4,7 @@ import type { Contact, Insert, Property, Scenario } from '../data/types.ts';
 import { downloadBlob, stamp, toCsv, toXlsx, type ExportColumn } from '../domain/exporting.ts';
 import { date, money, number, pct, todayParis } from '../domain/format.ts';
 import { OCCUPATION_LABELS, OWNERSHIP_LABELS, STATUS_LABELS, TYPE_LABELS } from '../domain/labels.ts';
-import { metrics, rentWithCharges, summarize, type PropertyMetrics } from '../domain/property.ts';
+import { ANNUAL_CHARGE_FIELDS, annualChargesTotal, metrics, rentWithCharges, summarize, type PropertyMetrics } from '../domain/property.ts';
 import { propertyRentalSummary, type PropertyRentalSummary } from '../domain/rental.ts';
 
 import { normalizeInputs, simulate } from '../domain/simulator.ts';
@@ -93,6 +93,12 @@ export function ownedColumns(): Column<PropertyRow>[] {
     { id: 'provision', label: 'Provision charges', value: (r) => r.rs.activeLeases[0]?.charges_amount ?? r.p.charges_provision ?? null, kind: 'money', align: 'right',
       render: (r) => money(r.rs.activeLeases[0]?.charges_amount ?? r.p.charges_provision), defaultHidden: true },
     { id: 'rentcc', label: 'Loyer CC', value: (r) => rentCC(r), kind: 'money', align: 'right', render: (r) => money(rentCC(r)), mobile: true },
+    { id: 'charges', label: 'Charges / an', value: (r) => annualChargesTotal(r.p), kind: 'money', align: 'right', render: (r) => money(annualChargesTotal(r.p)),
+      // détail au survol
+      sortable: true },
+    ...ANNUAL_CHARGE_FIELDS.map(([k, label]): Column<PropertyRow> => ({
+      id: k, label: `${label} / an`, value: (r) => r.p[k] ?? null, kind: 'money', align: 'right', render: (r) => money(r.p[k] ?? null), defaultHidden: true,
+    })),
     { id: 'received', label: `Encaissements ${y}`, value: (r) => r.rs.received, kind: 'money', align: 'right', render: (r) => money(r.rs.received) },
     { id: 'expenses', label: `Dépenses ${y}`, value: (r) => r.rs.expensesPaid, kind: 'money', align: 'right', render: (r) => money(r.rs.expensesPaid) },
     { id: 'balance', label: 'Solde locatif', value: (r) => r.rs.balance, kind: 'money', align: 'right',
