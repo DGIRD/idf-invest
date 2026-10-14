@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type ReactNode } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ButtonHTMLAttributes, type ReactNode } from 'react';
 import type { PropertyStatus } from '../data/types.ts';
 import { STATUS_LABELS, statusTone } from '../domain/labels.ts';
 
@@ -89,7 +89,8 @@ export function NumberInput({ label, value, onChange, suffix, hint, error, step,
 }) {
   const [text, setText] = useState(value === null || value === undefined ? '' : String(value).replace('.', ','));
   const last = useRef(value);
-  useEffect(() => {
+  // synchronisé avant l'affichage : une valeur proposée (ex. 80 % des charges) apparaît immédiatement
+  useLayoutEffect(() => {
     if (value !== last.current) {
       last.current = value;
       setText(value === null || value === undefined ? '' : String(value).replace('.', ','));

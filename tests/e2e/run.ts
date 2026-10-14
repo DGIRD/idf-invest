@@ -129,7 +129,12 @@ async function main() {
 
   await step('simulateur : négociation, loyer au m² bas/haut, charges de copropriété à 80 %', async () => {
     await page.goto(url + '#/simulateur');
-    const val = async (label: string) => (await page.getByLabel(label, { exact: true }).inputValue());
+    const val = async (label: string, expected?: string) => {
+      // attend que la valeur proposée soit affichée (machines lentes)
+      const field = page.getByLabel(label, { exact: true });
+      for (let i = 0; expected !== undefined && i < 50 && (await field.inputValue()) !== expected; i++) await page.waitForTimeout(100);
+      return field.inputValue();
+    };
     const shown = async (id: string) => (await page.locator(`output[aria-labelledby="${id}"]`).innerText()).replace(/[\u202f\u00a0]/g, ' ');
     assert.equal(await val('Assurance PNO'), '99', 'PNO à 99 € par défaut');
     await page.getByLabel('Prix de présentation FAI').fill('250000');
@@ -143,13 +148,13 @@ async function main() {
     await page.getByRole('radio', { name: 'Haut' }).click();
     assert.match(await shown('rent-hc'), /1 000,00 €/);
     await page.getByLabel('Charges de copropriété').fill('1000');
-    assert.equal(await val('dont récupérables'), '800');
-    assert.equal(await val('Provision sur charges'), '67');
+    assert.equal(await val('dont récupérables', '800'), '800');
+    assert.equal(await val('Provision sur charges', '67'), '67');
     assert.match(await shown('rent-cc'), /1 067,00 €/, 'loyer charges comprises');
     await page.getByLabel('Provision sur charges').fill('50');
     await page.getByLabel('Charges de copropriété').fill('1200');
-    assert.equal(await val('dont récupérables'), '960', 'part récupérable recalculée');
-    assert.equal(await val('Provision sur charges'), '50', 'valeur modifiée à la main conservée');
+    assert.equal(await val('dont récupérables', '960'), '960', 'part récupérable recalculée');
+    assert.equal(await val('Provision sur charges', '50'), '50', 'valeur modifiée à la main conservée');
     await page.screenshot({ path: join(out, '19-simulateur-loyer-m2.png'), fullPage: true });
   });
 
