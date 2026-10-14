@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { Snapshot } from '../src/data/repo.ts';
+import { EMPTY_SNAPSHOT, type Snapshot } from '../src/data/repo.ts';
 import type { Contact, Property, Scenario } from '../src/data/types.ts';
 import { buildBackup, materialize, parseBackup, planImport } from '../src/domain/backup.ts';
 import { excelSerial, toCsv, toXlsx } from '../src/domain/exporting.ts';
@@ -25,7 +25,7 @@ const contact = (o: Partial<Contact>): Contact => ({
   sector: null, notes: null, next_follow_up: null, archived_at: null, legacy_source: null, ...o,
 });
 const scen = (o: Partial<Scenario>): Scenario => ({ ...base, id: 's1', property_id: 'p1', name: 'S', inputs: { price: 100000 }, results: null, engine_version: '1', archived_at: null, legacy_simulation_id: null, ...o });
-const snap = (o: Partial<Snapshot>): Snapshot => ({ properties: [], scenarios: [], contacts: [], tasks: [], events: [], settings: null, loadedAt: '', ...o });
+const snap = (o: Partial<Snapshot>): Snapshot => ({ ...EMPTY_SNAPSHOT, ...o });
 
 test('statut « acquis » : date, occupation, photographie figée (copie indépendante)', () => {
   const s = scen({ inputs: { price: 200000 } });

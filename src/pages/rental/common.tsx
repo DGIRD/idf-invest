@@ -1,0 +1,282 @@
+import { useEffect, useMemo, useState } from 'react';
+import { useStore } from '../../data/store.tsx';
+import type { Lease, Payment, PaymentMethod, Receipt, RentCharge } from '../../data/types.ts';
+import { date, dateTime, money2, todayParis } from '../../domain/format.ts';
+import {
+  autoAllocate, CHARGE_STATUS_LABELS, chargeViews, checkAllocation, leaseState, leaseTenants, LEASE_STATE_LABELS, monthLabel,
+  PAYMENT_METHOD_LABELS, tenantName, type ChargeStatus, type ChargeView, type LeaseState,
+} from '../../domain/rental.ts';
+import { round2 } from '../../domain/simulator.ts';
+import { downloadBlob } from '../../domain/exporting.ts';
+import { Button, Modal, NumberInput, Select, TextInput } from '../../ui/components.tsx';
+import { buildReceiptPdf } from '../../../supabase/functions/_shared/receiptPdf.ts';
+
+export const METHODS = Object.entries(PAYMENT_METHOD_LABELS) as [PaymentMethod, string][];
+
+/** Données de gestion locative dérivées du Snapshot. */
+export function useRental() {
+  const { data } = useStore();
+  const today = todayParis();
+  return useMemo(() => {
+    const views = chargeViews(data.charges, data.allocations, today);
+    const viewById = new Map(views.map((v) => [v.charge.id, v]));
+    const leaseById = new Map(data.leases.map((l) => [l.id, l]));
+    const propertyById = new Map(data.properties.map((p) => [p.id, p]));
+    const leaseLabel = (l: Lease) => {
+      const p = propertyById.get(l.property_id);
+      const names = leaseTenants(l.id, data.leaseTenants, data.tenants).map(tenantName).join(', ');
+      return `${p?.title ?? 'Bien supprimé'}${l.label ? ` – ${l.label}` : ''}${names ? ` (${names})` : ''}`;
+    };
+    const quittanceFor = (chargeId: string) => data.receipts.find((r) => r.charge_id === chargeId && r.kind === 'quittance' && !r.cancelled_at) ?? null;
+    return { today, views, viewById, leaseById, propertyById, leaseLabel, quittanceFor };
+  }, [data, today]);
+}
+
+const STATUS_TONE: Record<ChargeStatus, string> = { payee: 'won', partielle: 'hot', impayee: 'bad', a_venir: 'early', annulee: 'closed' };
+export function ChargeBadge({ v }: { v: ChargeView }) {
+  const label = v.overdue && v.status === 'partielle' ? 'Partielle, en retard' : CHARGE_STATUS_LABELS[v.status];
+  return <span className={`status status-${STATUS_TONE[v.status]}`} title={v.overdue ? `${v.daysLate} jour(s) de retard` : undefined}>{label}</span>;
+}
+
+const LEASE_TONE: Record<LeaseState, string> = { a_venir: 'early', actif: 'active', termine: 'closed' };
+export function LeaseBadge({ lease }: { lease: Pick<Lease, 'start_date' | 'end_date'> }) {
+  const s = leaseState(lease, todayParis());
+  return <span className={`status status-${LEASE_TONE[s]}`}>{LEASE_STATE_LABELS[s]}</span>;
+}
+
+export const periodLabel = (c: Pick<RentCharge, 'period_start' | 'period_end' | 'kind' | 'label'>) =>
+  c.kind === 'loyer' ? monthLabel(c.period_start) + (c.period_start.endsWith('-01') ? '' : ` (à partir du ${date(c.period_start)})`) : (c.label ?? (c.kind === 'regularisation' ? 'Régularisation de charges' : 'Autre somme due'));
+
+// ---------------------------------------------------------------------
+// Enregistrer un paiement (avec répartition sur les échéances)
+// ---------------------------------------------------------------------
+export function PaymentDialog({ open, onClose, leaseId, chargeId, mode = 'saisie' }: {
+  open: boolean; onClose: () => void; leaseId?: string; chargeId?: string; mode?: 'saisie' | 'confirmation';
+}) {
+  const store = useStore();
+  const { data } = store;
+  const { views, leaseLabel, today } = useRental();
+  const [lease, setLease] = useState<string>(leaseId ?? '');
+  const [amount, setAmount] = useState<number | null>(null);
+  const [paidOn, setPaidOn] = useState(today);
+  const [dateTouched, setDateTouched] = useState(false);
+  const [method, setMethod] = useState<PaymentMethod>('virement');
+  const [reference, setReference] = useState('');
+  const [comment, setComment] = useState('');
+  const [manual, setManual] = useState<Record<string, number | null> | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const open_ = useMemo(() => views.filter((v) => v.charge.lease_id === lease && v.remaining > 0 && !v.charge.cancelled_at), [views, lease]);
+  const target = chargeId ? open_.find((v) => v.charge.id === chargeId) : undefined;
+
+  useEffect(() => {
+    if (!open) return;
+    setLease(leaseId ?? (data.leases.length === 1 ? data.leases[0]!.id : ''));
+    setPaidOn(today); setDateTouched(false); setMethod('virement'); setReference(''); setComment(''); setManual(null); setError(null);
+    const v = chargeId ? views.find((x) => x.charge.id === chargeId) : undefined;
+    setAmount(v ? v.remaining : null);
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const auto = useMemo(() => {
+    if (!amount || !(amount > 0)) return { allocations: [], remainder: 0 };
+    // une échéance ciblée est servie en premier
+    const ordered = target ? [target, ...open_.filter((v) => v !== target)] : open_;
+    if (target) {
+      const first = Math.min(amount, target.remaining);
+      const rest = autoAllocate(round2(amount - first), open_.filter((v) => v !== target));
+      return { allocations: [{ charge_id: target.charge.id, amount: round2(first) }, ...rest.allocations], remainder: rest.remainder };
+    }
+    return autoAllocate(amount, ordered);
+  }, [amount, open_, target]);
+
+  const plan = manual
+    ? Object.entries(manual).filter(([, a]) => a && a > 0).map(([charge_id, a]) => ({ charge_id, amount: round2(a!) }))
+    : auto.allocations;
+  const allocatedSum = round2(plan.reduce((s, a) => s + a.amount, 0));
+  const remainder = amount ? round2(amount - allocatedSum) : 0;
+
+  async function save() {
+    setError(null);
+    if (!lease) { setError('Choisissez le bail.'); return; }
+    if (!amount || !(amount > 0)) { setError('Indiquez un montant positif.'); return; }
+    if (!paidOn) { setError('Indiquez la date de réception.'); return; }
+    const err = checkAllocation(amount, plan, open_);
+    if (err) { setError(err); return; }
+    setBusy(true);
+    try {
+      const p = await store.create('payments', {
+        lease_id: lease, amount: round2(amount), paid_on: paidOn, method, reference: reference || null, comment: comment || null,
+        source: mode === 'confirmation' ? 'confirmation' : 'saisie', date_defaulted: mode === 'confirmation' && !dateTouched,
+      });
+      if (!p) return;
+      if (plan.length) {
+        const ok = await store.createMany('payment_allocations', plan.map((a) => ({ payment_id: p.id, charge_id: a.charge_id, amount: a.amount })));
+        if (!ok) { setError('Paiement enregistré, mais sa répartition a été refusée : reprenez-la depuis le bail.'); return; }
+      }
+      await store.refresh();
+      store.notify(mode === 'confirmation' ? 'Paiement confirmé.' : 'Paiement enregistré.');
+      onClose();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const activeLeases = data.leases.filter((l) => leaseState(l, today) !== 'a_venir' || l.id === leaseId);
+  const title = mode === 'confirmation' ? 'Confirmer un paiement reçu' : 'Enregistrer un paiement';
+
+  return (
+    <Modal open={open} title={title} onClose={onClose} wide
+      footer={<><Button onClick={onClose}>Annuler</Button><Button variant="primary" disabled={busy} onClick={() => void save()}>{busy ? 'Enregistrement…' : mode === 'confirmation' ? 'Confirmer le paiement' : 'Enregistrer le paiement'}</Button></>}>
+      {mode === 'confirmation' && target && (
+        <p className="note">Échéance de {periodLabel(target.charge)} : {money2(target.total)} dus le {date(target.charge.due_date)}, reste {money2(target.remaining)}. Seul un paiement que vous confirmez ici est enregistré : sans confirmation, le loyer reste impayé.</p>
+      )}
+      <div className="grid">
+        {!leaseId && (
+          <Select label="Bail" wide value={lease || null} onChange={(v) => { setLease(v ?? ''); setManual(null); }} allowEmpty="Choisir…"
+            options={activeLeases.map((l) => [l.id, leaseLabel(l)] as const)} />
+        )}
+        <NumberInput label="Montant reçu" suffix="€" value={amount} onChange={(v) => { setAmount(v); setManual(null); }} />
+        <Field2 label="Date de réception" hint={mode === 'confirmation' && !dateTouched ? 'Date du jour proposée par défaut : modifiez-la si vous la connaissez.' : undefined}>
+          {(id) => <input id={id} type="date" value={paidOn} max={today} onChange={(e) => { setPaidOn(e.target.value); setDateTouched(true); }} />}
+        </Field2>
+        <Select label="Moyen de paiement" value={method} onChange={(v) => setMethod(v ?? 'virement')} options={METHODS} />
+        <TextInput label="Référence" value={reference} onChange={setReference} maxLength={200} placeholder="N° de chèque, libellé du virement…" />
+        <TextInput label="Commentaire" wide value={comment} onChange={setComment} maxLength={2000} />
+      </div>
+
+      {lease && (
+        <div className="alloc">
+          <div className="section-head">
+            <h3>Répartition sur les échéances</h3>
+            {manual ? <Button size="sm" variant="ghost" onClick={() => setManual(null)}>Répartition automatique</Button>
+              : <Button size="sm" variant="ghost" disabled={!open_.length} onClick={() => setManual(Object.fromEntries(open_.map((v) => [v.charge.id, auto.allocations.find((a) => a.charge_id === v.charge.id)?.amount ?? null])))}>Répartir à la main</Button>}
+          </div>
+          {open_.length === 0 ? <p className="muted small">Aucune échéance ouverte : le montant sera conservé comme avance du locataire.</p> : (
+            <table className="dt-table compact">
+              <thead><tr><th>Échéance</th><th className="num">Reste dû</th><th className="num">Affecté</th></tr></thead>
+              <tbody>
+                {open_.map((v) => {
+                  const a = plan.find((x) => x.charge_id === v.charge.id)?.amount ?? 0;
+                  return (
+                    <tr key={v.charge.id}>
+                      <td>{periodLabel(v.charge)} <span className="muted small">dû le {date(v.charge.due_date)}</span></td>
+                      <td className="num">{money2(v.remaining)}</td>
+                      <td className="num">{manual ? (
+                        <input className="alloc-input" aria-label={`Montant affecté à ${periodLabel(v.charge)}`} inputMode="decimal" value={manual[v.charge.id] ?? ''}
+                          onChange={(e) => { const t = e.target.value.replace(',', '.').trim(); setManual({ ...manual, [v.charge.id]: t === '' ? null : Number(t) }); }} />
+                      ) : money2(a)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+          {remainder > 0 && <p className="small">Non affecté : <strong>{money2(remainder)}</strong>, conservé comme avance (trop-perçu) au crédit du locataire.</p>}
+          {remainder < 0 && <p className="form-error small">La répartition dépasse le montant reçu de {money2(-remainder)}.</p>}
+        </div>
+      )}
+      {error && <p className="form-error" role="alert">{error}</p>}
+    </Modal>
+  );
+}
+
+function Field2({ label, hint, children }: { label: string; hint?: string; children: (id: string) => React.ReactNode }) {
+  const id = `f-${label.replace(/\W+/g, '-')}`;
+  return (
+    <div className="field">
+      <label htmlFor={id}>{label}</label>
+      {children(id)}
+      {hint && <small className="muted">{hint}</small>}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------
+// Aperçu, téléchargement, envoi et annulation d'une quittance / d'un reçu
+// ---------------------------------------------------------------------
+export async function receiptBlob(r: Receipt, lease?: Lease): Promise<Blob> {
+  const pdfLib = await import('pdf-lib');
+  const bytes = await buildReceiptPdf(pdfLib, { ...r, charges_label: lease?.charges_mode === 'forfait' ? 'Forfait de charges' : 'Provision pour charges' });
+  return new Blob([bytes as BlobPart], { type: 'application/pdf' });
+}
+
+export function receiptFileName(r: Receipt) {
+  return `${r.kind === 'quittance' ? 'quittance' : 'recu'}-${r.number}-${r.period_start.slice(0, 7)}.pdf`;
+}
+
+const SEND_LABELS: Record<Receipt['send_status'], string> = { non_envoye: 'Non envoyé', a_envoyer: 'Envoi en attente', envoye: 'Envoyé', echec: 'Échec de l’envoi' };
+export const sendLabel = (r: Receipt) => (r.cancelled_at ? 'Annulé' : SEND_LABELS[r.send_status]);
+
+export function ReceiptDialog({ receipt, onClose }: { receipt: Receipt | null; onClose: () => void }) {
+  const store = useStore();
+  const lease = receipt ? store.data.leases.find((l) => l.id === receipt.lease_id) : undefined;
+  const [url, setUrl] = useState<string | null>(null);
+  const [cancelReason, setCancelReason] = useState<string | null>(null);
+  const live = receipt ? store.data.receipts.find((r) => r.id === receipt.id) ?? receipt : null;
+
+  useEffect(() => {
+    if (!receipt) return;
+    let u: string | null = null;
+    void receiptBlob(receipt, lease).then((b) => { u = URL.createObjectURL(b); setUrl(u); });
+    return () => { if (u) URL.revokeObjectURL(u); setUrl(null); setCancelReason(null); };
+  }, [receipt?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!live) return null;
+  const label = live.kind === 'quittance' ? 'Quittance' : 'Reçu';
+  return (
+    <Modal open={!!receipt} wide title={`${label} ${live.number}`} onClose={onClose}
+      footer={<>
+        {!live.cancelled_at && cancelReason === null && <Button variant="ghost" onClick={() => setCancelReason('')}>Annuler ce document</Button>}
+        <Button onClick={async () => downloadBlob(await receiptBlob(live, lease), receiptFileName(live))}>Télécharger le PDF</Button>
+        {!live.cancelled_at && (
+          <Button variant="primary" disabled={live.send_status === 'envoye' || live.send_status === 'a_envoyer'}
+            title={live.tenant_emails.length ? `À : ${live.tenant_emails.join(', ')}` : 'Aucun e-mail de locataire'}
+            onClick={() => void store.call((r) => r.queueReceiptEmail(live.id), store.repo.mode === 'demo' ? 'Mis en file (mode démonstration : aucun e-mail n’est envoyé).' : 'Envoi programmé.')}>
+            {live.send_status === 'envoye' ? 'Envoyé' : live.send_status === 'a_envoyer' ? 'Envoi en attente' : 'Envoyer au locataire'}
+          </Button>
+        )}
+      </>}>
+      <p className="muted small">
+        {label} du {date(live.issued_on)} pour {periodLabel({ ...live, kind: 'loyer', label: null })}. Statut : {sendLabel(live)}
+        {live.sent_at ? ` le ${dateTime(live.sent_at)}` : ''}{live.send_error && live.send_status !== 'envoye' ? ` (${live.send_error})` : ''}.
+        {live.cancelled_at && <> Annulé le {date(live.cancelled_at)} : {live.cancel_reason}.</>}
+      </p>
+      {cancelReason !== null && (
+        <div className="row cancel-row">
+          <TextInput label="Motif d’annulation" value={cancelReason} onChange={setCancelReason} maxLength={500} />
+          <Button variant="danger" disabled={!cancelReason.trim()} onClick={async () => {
+            if (await store.call((r) => r.cancelReceipt(live.id, cancelReason), 'Document annulé.')) setCancelReason(null);
+          }}>Confirmer l’annulation</Button>
+        </div>
+      )}
+      {url ? <iframe className="pdf-frame" title={`Aperçu ${label}`} src={url} /> : <p className="muted">Préparation de l’aperçu…</p>}
+      <p className="muted small">Modèle établi d’après les mentions usuelles d’une quittance ; relisez-le avant le premier envoi. Il n’a pas fait l’objet d’une validation juridique.</p>
+    </Modal>
+  );
+}
+
+/** Boutons d'action d'une échéance : payer, confirmer, quittance, reçu. */
+export function ChargeActions({ v, onPay, onConfirm, onReceipt }: {
+  v: ChargeView; onPay: (v: ChargeView) => void; onConfirm: (v: ChargeView) => void; onReceipt: (r: Receipt) => void;
+}) {
+  const store = useStore();
+  const { quittanceFor } = useRental();
+  const q = quittanceFor(v.charge.id);
+  if (v.charge.cancelled_at) return null;
+  return (
+    <div className="actions">
+      {v.remaining > 0 && <Button size="sm" onClick={() => (v.charge.due_date <= todayParis() ? onConfirm(v) : onPay(v))}>{v.charge.due_date <= todayParis() ? 'Confirmer le paiement' : 'Paiement anticipé'}</Button>}
+      {v.status === 'payee' && (q
+        ? <Button size="sm" variant="ghost" onClick={() => onReceipt(q)}>Quittance {q.number}</Button>
+        : <Button size="sm" variant="primary" onClick={async () => { const r = await store.call((repo) => repo.issueReceipt(v.charge.id, 'quittance'), 'Quittance émise.'); if (r) onReceipt(r); }}>Émettre la quittance</Button>)}
+      {v.status === 'partielle' && (
+        <Button size="sm" variant="ghost" onClick={async () => { const r = await store.call((repo) => repo.issueReceipt(v.charge.id, 'recu'), 'Reçu émis.'); if (r) onReceipt(r); }}>Reçu partiel</Button>
+      )}
+    </div>
+  );
+}
+
+export function paymentAllocated(p: Payment, allocations: { payment_id: string; amount: number }[]) {
+  return round2(allocations.filter((a) => a.payment_id === p.id).reduce((s, a) => s + a.amount, 0));
+}

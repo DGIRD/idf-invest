@@ -2,9 +2,11 @@ import { useMemo } from 'react';
 import { useStore } from '../data/store.tsx';
 import type { Contact, Insert, Property, Scenario } from '../data/types.ts';
 import { downloadBlob, stamp, toCsv, toXlsx, type ExportColumn } from '../domain/exporting.ts';
-import { date, money, number, pct } from '../domain/format.ts';
+import { date, money, number, pct, todayParis } from '../domain/format.ts';
 import { OCCUPATION_LABELS, OWNERSHIP_LABELS, STATUS_LABELS, TYPE_LABELS } from '../domain/labels.ts';
 import { metrics, rentWithCharges, summarize, type PropertyMetrics } from '../domain/property.ts';
+import { propertyRentalSummary, type PropertyRentalSummary } from '../domain/rental.ts';
+
 import { normalizeInputs, simulate } from '../domain/simulator.ts';
 import type { Column } from '../ui/DataTable.tsx';
 import { StatusBadge } from '../ui/components.tsx';
@@ -14,21 +16,29 @@ export interface PropertyRow {
   m: PropertyMetrics;
   agency: Contact | null;
   agent: Contact | null;
+  /** Suivi locatif de l'année en cours (biens détenus). */
+  rs: PropertyRentalSummary;
 }
 
 export function usePropertyRows(filter: (p: Property) => boolean): PropertyRow[] {
   const { data, simulatorDefaults } = useStore();
   return useMemo(() => {
     const contacts = new Map(data.contacts.map((c) => [c.id, c]));
+    const today = todayParis();
+    const year = Number(today.slice(0, 4));
+    const rental = { leases: data.leases, leaseTenants: data.leaseTenants, tenants: data.tenants, charges: data.charges, payments: data.payments, allocations: data.allocations, expenses: data.expenses };
     return data.properties.filter(filter).map((p) => ({
+      rs: propertyRentalSummary(p.id, year, today, rental),
       p,
       m: metrics(p, data.scenarios, simulatorDefaults),
       agency: p.agency_id ? contacts.get(p.agency_id) ?? null : null,
       agent: p.agent_id ? contacts.get(p.agent_id) ?? null : null,
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data.properties, data.scenarios, data.contacts, simulatorDefaults]);
+  }, [data, simulatorDefaults]);
 }
+
+const rentCC = (r: PropertyRow) => { const l = r.rs.activeLeases[0]; return l ? Math.round((l.rent_hc + l.charges_amount) * 100) / 100 : rentWithCharges(r.p); };
 
 const tone = (x: number | null | undefined) => (x === null || x === undefined ? '' : x >= 0 ? 'pos' : 'neg');
 
@@ -61,12 +71,15 @@ export function prospectColumns(): Column<PropertyRow>[] {
   ];
 }
 
-export interface OwnedRow extends PropertyRow {
-  /** Encaissements, dépenses : disponibles au lot 2 (suivi locatif). */
+/** Occupation affichée : « Loué » dès qu'un bail est en cours, sinon le statut saisi (jamais « Loué » sans bail). */
+export function occupationLabel(r: PropertyRow): string | null {
+  if (r.rs.activeLeases.length) return OCCUPATION_LABELS.loue;
+  if (!r.p.occupation_status) return null;
+  return r.p.occupation_status === 'loue' ? OCCUPATION_LABELS.vacant : OCCUPATION_LABELS[r.p.occupation_status];
 }
 
 export function ownedColumns(): Column<PropertyRow>[] {
-  const lot2 = 'Disponible au lot 2 (suivi des loyers et dépenses)';
+  const y = todayParis().slice(0, 4);
   return [
     { id: 'title', label: 'Bien', value: (r) => r.p.title, primary: true },
     { id: 'address', label: 'Adresse', value: (r) => [r.p.address, r.p.zip, r.p.city].filter(Boolean).join(' ') || null, mobile: true },
@@ -74,21 +87,25 @@ export function ownedColumns(): Column<PropertyRow>[] {
     { id: 'acquired', label: 'Acquis le', value: (r) => r.p.acquired_at, kind: 'date', render: (r) => date(r.p.acquired_at), mobile: true },
     { id: 'cost', label: 'Coût d’acquisition', value: (r) => r.p.acquisition_cost ?? r.p.acquisition_snapshot?.results?.totalCost ?? null, kind: 'money', align: 'right',
       render: (r) => money(r.p.acquisition_cost ?? r.p.acquisition_snapshot?.results?.totalCost ?? null) },
-    { id: 'occupation', label: 'Occupation', value: (r) => (r.p.occupation_status ? OCCUPATION_LABELS[r.p.occupation_status] : null), mobile: true },
-    { id: 'tenant', label: 'Locataire actif', value: () => null, sortable: false, render: () => <span className="muted" title={lot2}>lot 2</span> },
-    { id: 'rent', label: 'Loyer HC', value: (r) => r.p.estimated_rent, kind: 'money', align: 'right', render: (r) => money(r.p.estimated_rent) },
-    { id: 'provision', label: 'Provision charges', value: (r) => r.p.charges_provision ?? null, kind: 'money', align: 'right', render: (r) => money(r.p.charges_provision), defaultHidden: true },
-    { id: 'rentcc', label: 'Loyer CC', value: (r) => rentWithCharges(r.p), kind: 'money', align: 'right', render: (r) => money(rentWithCharges(r.p)), mobile: true },
-    { id: 'received', label: 'Encaissements', value: () => null, sortable: false, render: () => <span className="muted" title={lot2}>lot 2</span>, defaultHidden: true },
-    { id: 'expenses', label: 'Dépenses', value: () => null, sortable: false, render: () => <span className="muted" title={lot2}>lot 2</span>, defaultHidden: true },
-    { id: 'balance', label: 'Solde locatif', value: () => null, sortable: false, render: () => <span className="muted" title={lot2}>lot 2</span>, defaultHidden: true },
-    { id: 'cashflow', label: 'Cash-flow prévu / mois', value: (r) => r.m.result?.cashflowMonthlyYear1 ?? null, kind: 'money', align: 'right',
-      render: (r) => <span className={tone(r.m.result?.cashflowMonthlyYear1)} title="Cash-flow prévisionnel (simulation). Le cash-flow réel sera calculé au lot 2 à partir des encaissements et dépenses.">{money(r.m.result?.cashflowMonthlyYear1)}</span> },
+    { id: 'occupation', label: 'Occupation', value: occupationLabel, mobile: true },
+    { id: 'tenant', label: 'Locataire actif', value: (r) => r.rs.tenantNames || null, mobile: true },
+    { id: 'rent', label: 'Loyer HC', value: (r) => r.rs.activeLeases[0]?.rent_hc ?? r.p.estimated_rent, kind: 'money', align: 'right', render: (r) => money(r.rs.activeLeases[0]?.rent_hc ?? r.p.estimated_rent) },
+    { id: 'provision', label: 'Provision charges', value: (r) => r.rs.activeLeases[0]?.charges_amount ?? r.p.charges_provision ?? null, kind: 'money', align: 'right',
+      render: (r) => money(r.rs.activeLeases[0]?.charges_amount ?? r.p.charges_provision), defaultHidden: true },
+    { id: 'rentcc', label: 'Loyer CC', value: (r) => rentCC(r), kind: 'money', align: 'right', render: (r) => money(rentCC(r)), mobile: true },
+    { id: 'received', label: `Encaissements ${y}`, value: (r) => r.rs.received, kind: 'money', align: 'right', render: (r) => money(r.rs.received) },
+    { id: 'expenses', label: `Dépenses ${y}`, value: (r) => r.rs.expensesPaid, kind: 'money', align: 'right', render: (r) => money(r.rs.expensesPaid) },
+    { id: 'balance', label: 'Solde locatif', value: (r) => r.rs.balance, kind: 'money', align: 'right',
+      render: (r) => <span className={r.rs.overdue ? 'neg' : ''} title={r.rs.overdue ? `Impayé échu : ${money(r.rs.overdue)}` : r.rs.balance > 0 ? 'Avance des locataires' : undefined}>{money(r.rs.balance)}</span> },
+    { id: 'realcf', label: `Cash-flow réel ${y}`, value: (r) => r.rs.cashflow, kind: 'money', align: 'right',
+      render: (r) => <span className={tone(r.rs.cashflow)} title="Loyers encaissés − dépenses payées depuis le 1er janvier (hors dépôt de garantie, avant impôts)">{money(r.rs.cashflow)}</span>, mobile: true },
+    { id: 'cashflow', label: 'Cash-flow prévu / mois', value: (r) => r.m.result?.cashflowMonthlyYear1 ?? null, kind: 'money', align: 'right', defaultHidden: true,
+      render: (r) => <span className={tone(r.m.result?.cashflowMonthlyYear1)} title="Cash-flow prévisionnel de la simulation">{money(r.m.result?.cashflowMonthlyYear1)}</span> },
   ];
 }
 
 export function exportColumns(cols: Column<PropertyRow>[]): ExportColumn<PropertyRow>[] {
-  return cols.filter((c) => !['tenant', 'received', 'expenses', 'balance'].includes(c.id))
+  return cols
     .map((c) => ({ label: c.label, value: c.value, kind: c.kind === 'percent' ? 'percent' : c.kind }));
 }
 

@@ -6,7 +6,7 @@ import { isOwned } from '../domain/property.ts';
 import { DataTable } from '../ui/DataTable.tsx';
 import { Button, EmptyState, PageHeader, useConfirm } from '../ui/components.tsx';
 import { navigate } from '../ui/router.ts';
-import { exportRows, ownedColumns, usePropertyRows } from './propertyShared.tsx';
+import { exportRows, occupationLabel, ownedColumns, usePropertyRows } from './propertyShared.tsx';
 import { usePropertyActions } from './useActions.tsx';
 
 export function OwnedPage() {
@@ -16,7 +16,7 @@ export function OwnedPage() {
   const [occ, setOcc] = useState<OccupationStatus | ''>('');
   const all = usePropertyRows(isOwned);
   const columns = useMemo(() => ownedColumns(), []);
-  const rows = all.filter((r) => !occ || r.p.occupation_status === occ);
+  const rows = all.filter((r) => !occ || occupationLabel(r) === OCCUPATION_LABELS[occ]);
 
   return (
     <>
@@ -41,7 +41,9 @@ export function OwnedPage() {
         rowActions={(r) => [
           { label: 'Ouvrir la fiche', onSelect: () => navigate(`/bien/${r.p.id}`) },
           { label: 'Modifier', onSelect: () => navigate(`/bien/${r.p.id}/modifier`) },
-          ...(Object.keys(OCCUPATION_LABELS) as OccupationStatus[]).filter((o) => o !== r.p.occupation_status && o !== 'loue')
+          { label: 'Nouveau bail', onSelect: () => navigate(`/baux/nouveau?bien=${r.p.id}`) },
+          { label: 'Ajouter une dépense', onSelect: () => navigate(`/depenses?bien=${r.p.id}`) },
+          ...(Object.keys(OCCUPATION_LABELS) as OccupationStatus[]).filter((o) => o !== r.p.occupation_status && o !== 'loue' && !r.rs.activeLeases.length)
             .map((o) => ({ label: `Occupation : ${OCCUPATION_LABELS[o]}`, onSelect: () => void update('properties', r.p, { occupation_status: o }, `Le bien « ${r.p.title} »`) })),
           { label: 'Revenir en prospection', onSelect: () => void actions.setStatus(r.p, 'sous_compromis') },
           { label: 'Supprimer', danger: true, onSelect: () => void actions.del(r.p) },
@@ -56,7 +58,7 @@ export function OwnedPage() {
           Un bien passé au statut « Acquis » en prospection apparaît ici automatiquement, avec son historique.
         </EmptyState>}
       />
-      <p className="muted small">Le statut « Loué », le locataire actif, les encaissements, les dépenses et le cash-flow réel seront alimentés par les baux et paiements (lot 2). Le cash-flow affiché est celui de la simulation.</p>
+      <p className="muted small">« Loué » et le locataire actif découlent des baux en cours. Encaissements, dépenses et cash-flow réel portent sur l’année en cours (loyers encaissés − dépenses payées, hors dépôt de garantie, avant impôts). Le cash-flow prévu de la simulation peut être affiché via « Colonnes ».</p>
       <div className="export-row">
         <span className="muted">Exporter la liste affichée :</span>
         <Button size="sm" onClick={() => void exportRows('xlsx', 'mes-biens', columns, rows, data.scenarios)}>Excel (.xlsx)</Button>

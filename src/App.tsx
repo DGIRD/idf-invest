@@ -9,6 +9,11 @@ import { PropertyFormPage } from './pages/PropertyForm.tsx';
 import { ProspectionPage } from './pages/Prospection.tsx';
 import { SettingsPage } from './pages/Settings.tsx';
 import { SimulatorPage } from './pages/Simulator.tsx';
+import { DocumentsPage } from './pages/rental/Documents.tsx';
+import { ExpensesPage } from './pages/rental/Expenses.tsx';
+import { LeaseDetailPage } from './pages/rental/LeaseDetail.tsx';
+import { LeaseFormPage, LeasesPage } from './pages/rental/Leases.tsx';
+import { RentsPage } from './pages/rental/Rents.tsx';
 import { Layout, NAV } from './ui/Layout.tsx';
 import { EmptyState, Button } from './ui/components.tsx';
 import { navigate, useRoute } from './ui/router.ts';
@@ -44,6 +49,17 @@ export function App() {
     else page = <SimulatorPage key={key} scenarioId={b} propertyId={route.query.get('bien') ?? undefined} />;
   } else if (a === 'contacts') { active = 'contacts'; page = b ? <ContactDetailPage key={b} id={b} /> : <ContactsPage />; }
   else if (a === 'parametres') { active = 'parametres'; page = <SettingsPage />; }
+  else if (a === 'locataires') { active = 'locataires'; page = <LeasesPage key={key} tab={route.query.get('onglet') === 'locataires' ? 'locataires' : 'baux'} />; }
+  else if (a === 'baux' && b === 'nouveau') { active = 'locataires'; page = <LeaseFormPage key={key} propertyId={route.query.get('bien') ?? undefined} />; }
+  else if (a === 'baux' && b) {
+    active = 'locataires';
+    if (!data.leases.some((l) => l.id === b) && sync.state === 'loading') page = <p className="muted">Chargement…</p>;
+    else page = c === 'modifier' ? <LeaseFormPage key={key} id={b} /> : <LeaseDetailPage id={b} />;
+  }
+  else if (a === 'baux') { active = 'locataires'; page = <LeasesPage key={key} />; }
+  else if (a === 'loyers') { active = 'loyers'; page = <RentsPage />; }
+  else if (a === 'depenses') { active = 'depenses'; page = <ExpensesPage key={key} propertyId={route.query.get('bien') ?? undefined} />; }
+  else if (a === 'documents') { active = 'documents'; page = <DocumentsPage />; }
   else {
     const item = NAV.find((n) => n.path === `/${a}`);
     if (item?.plannedLot) { active = item.key; page = <ComingSoonPage item={item} />; }
