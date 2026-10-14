@@ -375,3 +375,30 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 .computed { display: flex; align-items: baseline; gap: .3rem; min-height: 40px; padding: .5rem .65rem; border: 1px dashed var(--line-strong); border-radius: var(--radius); background: var(--paper); font-weight: 600; }
 .computed small { font-weight: 400; color: var(--ink-soft); }
+
+/* ---------- Gestion locative ---------- */
+.pill-warn { background: var(--ocre-tint); color: var(--ocre); }
+.pill-bad { background: var(--brique-tint); color: var(--brique); }
+.status-bad { background: var(--brique-tint); color: var(--brique); }
+.actions { display: flex; flex-wrap: wrap; gap: .35rem; }
+.alloc { margin-top: 1rem; border-top: 1px solid var(--line); padding-top: .75rem; }
+.alloc h3 { margin: 0; }
+.alloc-input { width: 7.5rem; min-height: 34px; padding: .3rem .5rem; border: 1px solid var(--line-strong); border-radius: var(--radius); text-align: right; background: var(--surface); }
+.pdf-frame { width: 100%; height: min(70vh, 760px); border: 1px solid var(--line); border-radius: var(--radius); background: #fff; }
+.tenant-picker { margin-top: 1rem; }
+.chips { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin: .4rem 0; }
+.chip { display: inline-flex; align-items: center; gap: .4rem; padding: .35rem .75rem; border: 1px solid var(--line-strong); border-radius: 99px; cursor: pointer; background: var(--surface); }
+.chip.on { border-color: var(--sapin); background: var(--mousse); color: var(--sapin); font-weight: 600; }
+.chip input { accent-color: var(--sapin); }
+.toggles { display: flex; flex-direction: column; gap: .35rem; }
+.toggles .muted { margin: 0 0 .6rem 1.85rem; }
+.inline-form { margin: .9rem 0 .6rem; }
+.tpl { border: 1px solid var(--line); border-radius: var(--radius); padding: .6rem .9rem; margin: .5rem 0; }
+.tpl summary { cursor: pointer; font-weight: 600; }
+.cancel-row { align-items: flex-end; margin-bottom: .75rem; }
+.dt-table tr.muted td { color: var(--ink-soft); }
+button.figure { text-align: left; font: inherit; background: none; border: 0; border-right: 1px solid var(--line); cursor: pointer; }
+@media (max-width: 760px) {
+  .pdf-frame { height: 60vh; }
+  button.figure { border-right: 0; border-bottom: 1px solid var(--line); }
+}

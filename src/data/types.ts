@@ -114,8 +114,194 @@ export interface UserSettings {
   user_id: string;
   simulator_defaults: Partial<SimulationInputs>;
   ui_prefs: Record<string, unknown>;
+  rental_settings?: RentalSettings;
   version: number;
   updated_at: string;
+}
+
+export interface ReminderTemplate {
+  subject: string;
+  body: string;
+}
+export interface RentalSettings {
+  landlord_name?: string;
+  landlord_address?: string;
+  /** Modèles de relance, niveaux 1 à 3. */
+  reminder_templates?: ReminderTemplate[];
+}
+
+// ---------------------------------------------------------------------
+// Lot 2 : gestion locative
+// ---------------------------------------------------------------------
+export interface Tenant extends Versioned {
+  first_name: string | null;
+  last_name: string;
+  email: string | null;
+  phone: string | null;
+  notes: string | null;
+  archived_at: string | null;
+}
+
+export interface Lease extends Versioned {
+  property_id: string;
+  label: string | null;
+  furnished: boolean;
+  start_date: string;
+  end_date: string | null;
+  rent_hc: number;
+  charges_amount: number;
+  charges_mode: 'provision' | 'forfait';
+  deposit_amount: number;
+  payment_day: number;
+  landlord_name: string | null;
+  landlord_address: string | null;
+  owner_confirmation_email: boolean;
+  receipt_auto_send: boolean;
+  reminder_enabled: boolean;
+  reminder_delay_days: number;
+  notes: string | null;
+}
+
+export interface LeaseTenant {
+  lease_id: string;
+  tenant_id: string;
+  user_id: string;
+  left_on: string | null;
+  created_at: string;
+}
+
+export type ChargeKind = 'loyer' | 'regularisation' | 'autre';
+export interface RentCharge extends Versioned {
+  lease_id: string;
+  kind: ChargeKind;
+  period_start: string;
+  period_end: string;
+  due_date: string;
+  rent_amount: number;
+  charges_amount: number;
+  label: string | null;
+  cancelled_at: string | null;
+}
+
+export type PaymentMethod = 'virement' | 'prelevement' | 'cheque' | 'especes' | 'caf' | 'autre';
+export interface Payment extends Versioned {
+  lease_id: string;
+  amount: number;
+  paid_on: string;
+  date_defaulted: boolean;
+  method: PaymentMethod;
+  reference: string | null;
+  comment: string | null;
+  source: 'saisie' | 'confirmation' | 'import';
+}
+
+export interface Allocation {
+  id: string;
+  user_id: string;
+  payment_id: string;
+  charge_id: string;
+  amount: number;
+  created_at: string;
+}
+
+export interface DepositMovement {
+  id: string;
+  user_id: string;
+  lease_id: string;
+  kind: 'encaissement' | 'restitution' | 'retenue';
+  amount: number;
+  occurred_on: string;
+  comment: string | null;
+  created_at: string;
+}
+
+export interface Receipt {
+  id: string;
+  user_id: string;
+  lease_id: string;
+  charge_id: string;
+  kind: 'quittance' | 'recu';
+  number: string;
+  issued_on: string;
+  period_start: string;
+  period_end: string;
+  rent_amount: number;
+  charges_amount: number;
+  paid_amount: number;
+  payments: { date: string; amount: number; method: PaymentMethod }[];
+  tenant_names: string;
+  tenant_emails: string[];
+  landlord_name: string | null;
+  landlord_address: string | null;
+  property_address: string | null;
+  send_status: 'non_envoye' | 'a_envoyer' | 'envoye' | 'echec';
+  sent_at: string | null;
+  send_error: string | null;
+  cancelled_at: string | null;
+  cancel_reason: string | null;
+  created_at: string;
+}
+
+export type ReminderStatus = 'brouillon' | 'a_envoyer' | 'envoye' | 'echec' | 'annule' | 'envoye_manuellement';
+export interface Reminder extends Versioned {
+  lease_id: string;
+  level: number;
+  charge_ids: string[];
+  debt_amount: number;
+  subject: string;
+  body: string;
+  recipients: string[];
+  status: ReminderStatus;
+  created_by: 'proprietaire' | 'automatique';
+  sent_at: string | null;
+  error: string | null;
+}
+
+export type DocumentCategory = 'bail' | 'quittance' | 'facture' | 'diagnostic' | 'assurance' | 'fiscal' | 'copropriete' | 'photo' | 'identite' | 'autre';
+export interface DocumentRow extends Versioned {
+  property_id: string | null;
+  lease_id: string | null;
+  tenant_id: string | null;
+  category: DocumentCategory;
+  title: string;
+  storage_path: string;
+  mime_type: string;
+  size_bytes: number;
+  notes: string | null;
+}
+
+export type ExpenseCategory = 'copropriete' | 'taxe_fonciere' | 'assurance' | 'interets' | 'frais_bancaires' | 'travaux' | 'mobilier' | 'entretien' | 'gestion' | 'autre';
+export type ExpenseNature = 'charge' | 'immobilisation' | 'remboursement_capital' | 'tresorerie';
+export interface Expense extends Versioned {
+  property_id: string;
+  expense_date: string;
+  supplier: string | null;
+  label: string | null;
+  amount: number;
+  category: ExpenseCategory;
+  nature: ExpenseNature;
+  recoverable_amount: number;
+  payment_status: 'a_payer' | 'paye';
+  paid_on: string | null;
+  document_id: string | null;
+  notes: string | null;
+}
+
+export interface OutboxMessage {
+  id: string;
+  user_id: string;
+  kind: 'confirmation_paiement' | 'quittance' | 'relance' | 'relance_a_valider';
+  to_emails: string[];
+  subject: string;
+  status: 'a_envoyer' | 'en_cours' | 'envoye' | 'echec' | 'annule';
+  receipt_id: string | null;
+  reminder_id: string | null;
+  lease_id: string | null;
+  charge_id: string | null;
+  attempts: number;
+  last_error: string | null;
+  sent_at: string | null;
+  created_at: string;
 }
 
 export interface Tables {
@@ -124,9 +310,25 @@ export interface Tables {
   pro_contacts: Contact;
   property_tasks: PropertyTask;
   timeline_events: TimelineEvent;
+  tenants: Tenant;
+  leases: Lease;
+  lease_tenants: LeaseTenant;
+  rent_charges: RentCharge;
+  payments: Payment;
+  payment_allocations: Allocation;
+  deposit_movements: DepositMovement;
+  reminders: Reminder;
+  documents: DocumentRow;
+  expenses: Expense;
 }
 export type TableName = keyof Tables;
-export type VersionedTable = 'properties' | 'scenarios' | 'pro_contacts' | 'property_tasks';
+/** Tables en lecture seule côté navigateur (écrites par les fonctions serveur). */
+export interface ReadOnlyTables {
+  receipts: Receipt;
+  email_outbox: OutboxMessage;
+}
+export type VersionedTable = 'properties' | 'scenarios' | 'pro_contacts' | 'property_tasks'
+  | 'tenants' | 'leases' | 'rent_charges' | 'payments' | 'reminders' | 'documents' | 'expenses';
 
 /** Colonnes gérées par le serveur, jamais envoyées par le client. */
 export type ServerManaged = 'id' | 'user_id' | 'version' | 'created_at' | 'updated_at';

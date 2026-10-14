@@ -1,4 +1,4 @@
-# Guide utilisateur — lot 1
+# Guide utilisateur — lots 1 et 2
 
 ## Se connecter
 
@@ -22,13 +22,49 @@ Bouton **Marquer comme acquis** (ou statut « Acquis »). Après confirmation, l
 
 ## Mes biens
 
-Les biens détenus, acquis depuis la prospection ou ajoutés directement (**Ajouter un bien détenu**) : mode de détention, régime fiscal renseigné, date et coût d'acquisition, occupation. Locataires, loyers encaissés, dépenses et cash-flow réel arrivent au lot 2 ; le cash-flow affiché est celui de la simulation.
+Les biens détenus, acquis depuis la prospection ou ajoutés directement (**Ajouter un bien détenu**) : mode de détention, régime fiscal renseigné, date et coût d'acquisition, occupation. Voir plus bas « Mes biens » pour le suivi locatif.
 
 ## Simulateur
 
 Accessible seul ou depuis un bien (pré-rempli avec prix, travaux et loyer estimé). Les résultats se mettent à jour à chaque saisie. Indiquez si le prix inclut les honoraires d'agence pour éviter de les compter deux fois. Enregistrez plusieurs scénarios par bien ; le premier devient le **scénario principal** (modifiable dans l'onglet Simulations de la fiche), utilisé dans les tableaux et la comparaison. Le tableau d'amortissement s'affiche par année ou par mois et s'exporte en Excel. « Méthode de calcul » détaille les formules. Les valeurs par défaut se règlent dans **Paramètres**.
 
 Les résultats sont avant impôts et ne constituent pas un conseil financier.
+
+## Locataires et baux
+
+**Nouveau bail** : choisissez un bien détenu, cochez le ou les titulaires (ou créez-les), indiquez les dates, le loyer hors charges, la provision ou le forfait de charges, le jour de paiement et le dépôt de garantie. Les échéances jusqu'au mois en cours sont créées immédiatement, puis chaque mois par le serveur.
+
+Colocation : plusieurs titulaires sur un même bail, ou un bail par chambre. Au départ d'un colocataire, indiquez sa date de départ dans l'onglet Titulaires. Au départ du locataire, renseignez la fin du bail : les échéances suivantes non réglées sont annulées. Un nouveau bail peut ensuite être créé pour le même bien ; l'historique des anciens baux reste consultable.
+
+La fiche du bail regroupe échéances, paiements, quittances et reçus, relances, dépôt de garantie, titulaires et documents.
+
+## Loyers et paiements
+
+- **Enregistrer un paiement** : montant, date, moyen, référence. Il est réparti automatiquement de la plus ancienne échéance à la plus récente (modifiable avec « Répartir à la main »). Un excédent est conservé en avance (trop-perçu) et peut être affecté plus tard.
+- **Confirmer le paiement** (échéance passée) : la date du jour est proposée par défaut et le paiement est marqué « date par défaut » tant que vous ne la corrigez pas. Sans confirmation, l'échéance reste impayée, même si vous ne répondez pas à l'e-mail de rappel.
+- Le **solde** d'un bail est toujours calculé à partir des échéances et des paiements : il ne se saisit pas. Le dépôt de garantie n'y entre pas.
+
+## Quittances et reçus
+
+**Émettre la quittance** n'est proposé que pour une échéance intégralement réglée ; une seule quittance par période. Pour un paiement partiel, un **reçu** indique la somme reçue et le reste dû. Chaque document s'ouvre en aperçu, se télécharge en PDF et peut être envoyé au locataire par e-mail (adresse renseignée dans sa fiche). Une quittance émise par erreur s'annule avec un motif ; ses paiements redeviennent alors modifiables.
+
+Envoi automatique (option du bail) : la quittance part seule quand un paiement que vous avez saisi ou confirmé règle exactement la période. Elle ne part jamais sur la seule base d'une date.
+
+## Relances
+
+« Préparer une relance » rédige un rappel amiable à partir de votre modèle (Paramètres), avec le montant dû et les périodes. Relisez, modifiez, puis envoyez par e-mail ou marquez « envoyée par vos soins » (courrier). Si l'option est activée sur le bail, une relance est préparée automatiquement après le délai choisi et vous êtes prévenu : elle n'est jamais envoyée sans votre validation, et elle est annulée si la dette est réglée entre-temps. Aucune pénalité n'est ajoutée.
+
+## Dépenses
+
+Par bien : date, fournisseur, montant, catégorie, **nature** (charge, immobilisation, remboursement de capital, trésorerie), part récupérable sur le locataire, statut (payée ou à payer) et justificatif. Les totaux par nature et l'export Excel facilitent la préparation de la déclaration ; ils ne constituent pas une attestation fiscale.
+
+## Documents
+
+PDF, images, Word, Excel ou texte, 10 Mo maximum, rattachés à un bien, un bail ou une dépense. Ils sont privés : chaque ouverture passe par un lien valable 60 secondes. Supprimer un document supprime aussi le fichier.
+
+## Mes biens
+
+Pour chaque bien détenu : locataire actif, « Loué » dès qu'un bail est en cours, loyers encaissés et dépenses payées depuis le 1er janvier, solde locatif et cash-flow réel (encaissements − dépenses payées, avant impôts, hors dépôt de garantie).
 
 ## Contacts
 

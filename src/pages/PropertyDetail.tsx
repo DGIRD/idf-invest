@@ -5,9 +5,12 @@ import { date, dateTime, money, money2, number, pct, todayParis } from '../domai
 import { CHANNEL_LABELS, EVENT_LABELS, OCCUPATION_LABELS, OWNERSHIP_LABELS, STATUS_LABELS, STATUS_ORDER, TAX_REGIME_LABELS, TYPE_LABELS } from '../domain/labels.ts';
 import { isOwned, metrics, rentWithCharges, scenarioResult } from '../domain/property.ts';
 import { normalizeInputs, simulate } from '../domain/simulator.ts';
-import { Button, EmptyState, KeyValue, NotAvailable, PageHeader, Section, StatusBadge, Tabs, TextInput, useConfirm } from '../ui/components.tsx';
+import { Button, EmptyState, KeyValue, PageHeader, Section, StatusBadge, Tabs, TextInput, useConfirm } from '../ui/components.tsx';
 import { href, navigate } from '../ui/router.ts';
 import { usePropertyActions } from './useActions.tsx';
+import { DocumentList } from './rental/Documents.tsx';
+import { LeaseBadge } from './rental/common.tsx';
+import { EXPENSE_CATEGORY_LABELS, leaseTenants, propertyRentalSummary, tenantName } from '../domain/rental.ts';
 
 type Tab = 'synthese' | 'simulations' | 'historique' | 'taches' | 'documents' | 'gestion';
 
@@ -37,7 +40,7 @@ export function PropertyDetailPage({ id }: { id: string }) {
     ['historique', `Historique et échanges (${events.length})`],
     ['taches', `Tâches (${openTasks})`],
     ['documents', 'Photos et documents'],
-    ...(owned ? [['gestion', 'Baux, paiements, dépenses'] as [Tab, string]] : []),
+    ...(owned ? [['gestion', 'Baux, loyers, dépenses'] as [Tab, string]] : []),
   ];
 
   return (
@@ -141,16 +144,8 @@ export function PropertyDetailPage({ id }: { id: string }) {
 
       {tab === 'historique' && <Timeline propertyId={p.id} events={events} />}
       {tab === 'taches' && <Tasks propertyId={p.id} tasks={tasks} />}
-      {tab === 'documents' && (
-        <Section title="Photos et documents">
-          <NotAvailable>Le stockage privé des photos et documents (classement, accès temporaire sécurisé, contrôle des types et tailles) est prévu au lot 2. Aucun fichier ne peut encore être déposé.</NotAvailable>
-        </Section>
-      )}
-      {tab === 'gestion' && (
-        <Section title="Gestion locative">
-          <NotAvailable>Baux successifs, locataires, échéances, paiements, quittances, dépenses et interventions arrivent au lot 2. Ce bien est prêt à les recevoir.</NotAvailable>
-        </Section>
-      )}
+      {tab === 'documents' && <DocumentList filter={{ property_id: p.id }} />}
+      {tab === 'gestion' && <PropertyRental propertyId={p.id} />}
       {dialog}
     </>
   );
@@ -294,5 +289,45 @@ function Tasks({ propertyId, tasks }: { propertyId: string; tasks: PropertyTask[
         </ul>
       )}
     </Section>
+  );
+}
+
+function PropertyRental({ propertyId }: { propertyId: string }) {
+  const { data } = useStore();
+  const today = todayParis();
+  const year = today.slice(0, 4);
+  const rs = propertyRentalSummary(propertyId, Number(year), today, { leases: data.leases, leaseTenants: data.leaseTenants, tenants: data.tenants, charges: data.charges, payments: data.payments, allocations: data.allocations, expenses: data.expenses });
+  const leases = data.leases.filter((l) => l.property_id === propertyId).sort((a, b) => b.start_date.localeCompare(a.start_date));
+  const expenses = data.expenses.filter((e) => e.property_id === propertyId).sort((a, b) => b.expense_date.localeCompare(a.expense_date)).slice(0, 8);
+  return (
+    <>
+      <div className="figures">
+        <Figure label={`Loyers encaissés ${year}`} value={money(rs.received)} />
+        <Figure label={`Dépenses payées ${year}`} value={money(rs.expensesPaid)} />
+        <Figure label={`Cash-flow réel ${year}`} value={money(rs.cashflow)} tone={rs.cashflow >= 0 ? 'pos' : 'neg'} hint="avant impôts, hors dépôt de garantie" />
+        <Figure label="Solde locatif" value={money(rs.balance)} tone={rs.overdue ? 'neg' : undefined} hint={rs.overdue ? `dont impayé échu ${money(rs.overdue)}` : 'à jour'} />
+      </div>
+      <div className="two-col">
+        <Section title="Baux" actions={<Button size="sm" variant="primary" onClick={() => navigate(`/baux/nouveau?bien=${propertyId}`)}>Nouveau bail</Button>}>
+          {leases.length === 0 ? <p className="muted">Aucun bail. Le bien est considéré comme non loué.</p> : (
+            <ul className="scenario-list">{leases.map((l) => (
+              <li key={l.id}>
+                <div>
+                  <a className="strong" href={href(`/baux/${l.id}`)}>{leaseTenants(l.id, data.leaseTenants, data.tenants, false).map(tenantName).join(', ') || 'Sans titulaire'}</a>{' '}<LeaseBadge lease={l} />
+                  <p className="muted small">Du {date(l.start_date)}{l.end_date ? ` au ${date(l.end_date)}` : ''}, {money(l.rent_hc + l.charges_amount)} charges comprises</p>
+                </div>
+              </li>
+            ))}</ul>
+          )}
+        </Section>
+        <Section title="Dernières dépenses" actions={<Button size="sm" onClick={() => navigate(`/depenses?bien=${propertyId}`)}>Voir et ajouter</Button>}>
+          {expenses.length === 0 ? <p className="muted">Aucune dépense.</p> : (
+            <ul className="plain">{expenses.map((e) => (
+              <li key={e.id}>{date(e.expense_date)}, {EXPENSE_CATEGORY_LABELS[e.category]}{e.supplier ? ` (${e.supplier})` : ''} : <strong>{money(e.amount)}</strong>{e.payment_status === 'a_payer' ? ' à payer' : ''}</li>
+            ))}</ul>
+          )}
+        </Section>
+      </div>
+    </>
   );
 }

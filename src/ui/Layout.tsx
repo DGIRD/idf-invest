@@ -17,11 +17,11 @@ export const NAV: NavItem[] = [
   { key: 'prospection', label: 'Prospection', path: '/prospection' },
   { key: 'simulateur', label: 'Simulateur', path: '/simulateur' },
   { key: 'biens', label: 'Mes biens', path: '/biens' },
-  { key: 'locataires', label: 'Locataires et baux', path: '/locataires', plannedLot: 2 },
-  { key: 'loyers', label: 'Loyers et paiements', path: '/loyers', plannedLot: 2 },
-  { key: 'depenses', label: 'Dépenses', path: '/depenses', plannedLot: 2 },
+  { key: 'locataires', label: 'Locataires et baux', path: '/locataires' },
+  { key: 'loyers', label: 'Loyers et paiements', path: '/loyers' },
+  { key: 'depenses', label: 'Dépenses', path: '/depenses' },
   { key: 'contacts', label: 'Contacts', path: '/contacts' },
-  { key: 'documents', label: 'Documents', path: '/documents', plannedLot: 2 },
+  { key: 'documents', label: 'Documents', path: '/documents' },
   { key: 'synthese', label: 'Synthèse annuelle', path: '/synthese', plannedLot: 3 },
   { key: 'abonnement', label: 'Mon abonnement', path: '/abonnement', plannedLot: 3 },
   { key: 'parametres', label: 'Paramètres', path: '/parametres' },
@@ -46,7 +46,7 @@ function SyncIndicator() {
 }
 
 export function Layout({ active, children }: { active: string; children: ReactNode }) {
-  const { session, signOut, repo, toasts, dismissToast, conflict, sync } = useStore();
+  const { session, signOut, repo, toasts, dismissToast, conflict, sync, data } = useStore();
   const [open, setOpen] = useState(false);
   useEffect(() => { setOpen(false); }, [active]);
 
@@ -58,6 +58,11 @@ export function Layout({ active, children }: { active: string; children: ReactNo
         </div>
       )}
       {sync.state === 'offline' && <div className="offline-banner" role="status">{sync.message ?? 'Hors connexion.'}</div>}
+      {data.missingTables.length > 0 && (
+        <div className="offline-banner" role="alert">
+          Mise à jour de la base requise : la gestion locative n’est pas encore installée dans Supabase. Exécutez la migration SQL du lot 2 (voir la documentation).
+        </div>
+      )}
 
       <header className="topbar">
         <button type="button" className="icon-btn nav-toggle" aria-expanded={open} aria-controls="main-nav" onClick={() => setOpen(!open)}>

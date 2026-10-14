@@ -1,4 +1,4 @@
-# État du projet — lot 1 (13 octobre 2026)
+# État du projet — lots 1 et 2 (14 octobre 2026)
 
 Légende : **Implémenté et testé** = code livré et couvert par un test automatisé exécuté · **Implémenté** = code livré, vérifié à la main seulement · **À configurer** = code livré, nécessite un service externe · **Restant** = non commencé.
 
@@ -32,19 +32,52 @@ Légende : **Implémenté et testé** = code livré et couvert par un test autom
 | Rendu mobile 390 px sans défilement horizontal | Implémenté et testé | e2e + captures |
 | CI GitHub Actions et déploiement GitHub Pages | À configurer | workflows livrés, non exécutés ici |
 
-## Restant
+## Livré dans le lot 2 — gestion locative
 
-**Lot 2 — gestion locative** : locataires, baux successifs, colocations, dépôt de garantie séparé ; échéances, paiements multiples/partiels/trop-perçus, soldes calculés ; e-mail mensuel de confirmation au propriétaire ; quittances PDF (période intégralement réglée seulement) et reçus ; relances d'impayés ; dépenses et justificatifs ; stockage privé des documents et photos ; tâches serveur (Edge Functions + planification, fuseau Europe/Paris, journal, anti-doublons).
+| Fonction | État | Preuve |
+|---|---|---|
+| Locataires (coordonnées, archivage) et baux successifs par bien détenu | Implémenté et testé | SQL + e2e |
+| Colocation : plusieurs titulaires par bail, départ d'un colocataire, ou plusieurs baux simultanés | Implémenté et testé (titulaires) / implémenté (départ) | SQL + e2e |
+| Location vide ou meublée, loyer HC, provision ou forfait de charges, jour de paiement | Implémenté et testé | e2e |
+| Échéances mensuelles générées depuis le bail (prorata, idempotentes), sommes dues additionnelles (régularisation) | Implémenté et testé | SQL + unitaires (mêmes résultats TS/SQL) |
+| Paiements : plusieurs paiements par échéance, un paiement sur plusieurs échéances, partiel, trop-perçu conservé en avance | Implémenté et testé | SQL + unitaires + e2e |
+| Solde calculé uniquement depuis échéances et paiements ; statuts payée / partielle / impayée / à venir / annulée | Implémenté et testé | unitaires + SQL |
+| Confirmation du paiement : date du jour par défaut, signalée et modifiable ; absence de réponse ≠ paiement | Implémenté et testé | SQL + e2e |
+| Dépôt de garantie suivi séparément (encaissement, restitution, retenue) | Implémenté et testé | SQL + e2e |
+| Quittance PDF : aperçu, téléchargement, historique, numérotation, uniquement si période intégralement réglée, jamais en double, annulation motivée | Implémenté et testé | SQL + unitaires + e2e |
+| Reçu de paiement partiel (« ne vaut pas quittance ») | Implémenté et testé | SQL + e2e |
+| Envoi de la quittance au locataire, envoi automatique sous conditions | Implémenté et testé (file, règles) / **à configurer** (envoi réel) | SQL + unitaires |
+| Relances amiables : modèles modifiables, aperçu, délai, arrêt quand la dette est réglée, historique | Implémenté et testé | SQL + e2e |
+| E-mail mensuel au propriétaire pour confirmer le paiement | Implémenté et testé (préparation) / **à configurer** (envoi réel) | SQL |
+| Tâches serveur planifiées (fuseau Paris, journal, anti-doublons, reprises sur erreur) | Implémenté et testé (SQL, logique d'envoi) / **à configurer** (déploiement, planification, Resend) | SQL + unitaires |
+| Dépenses par bien : catégorie, nature (charge, immobilisation, capital, trésorerie), part récupérable, statut, justificatif | Implémenté et testé | SQL + e2e |
+| Documents privés : bucket privé, chemins par compte, types et taille contrôlés, lien temporaire 60 s, suppression des fichiers | Implémenté et testé (règles SQL, interface en démonstration) / **non testé** contre le vrai stockage Supabase | SQL + e2e |
+| Mes biens : locataire actif, « Loué » déduit des baux, encaissements, dépenses, solde, cash-flow réel de l'année | Implémenté et testé | e2e |
+| Tableau de bord : impayés, quittances à émettre, relances à valider | Implémenté | captures |
+| Exports .xlsx / CSV des échéances, paiements, dépenses ; sauvegarde JSON incluant la gestion locative | Implémenté | — |
+
+## Restant
 
 **Lot 3 — plateforme** : abonnements Stripe (mensuel/annuel, webhooks vérifiés côté serveur, renouvellement, résiliation, échec, remboursement, expiration, événements dupliqués) ; contrôle d'accès par abonnement dans les règles RLS ; parcours d'invitation sans mot de passe en clair ; Mon abonnement ; administration (utilisateurs, tarifs, incidents, e-mails, journal, prospects commerciaux séparés, accès support journalisé) ; synthèse annuelle selon le régime renseigné ; import CSV.
 
 ## Limites connues
+
+### Lot 2
+- **Migration SQL à exécuter** : `supabase/migrations/20261014000200_lot2_gestion_locative.sql`. Tant qu'elle ne l'est pas, l'application fonctionne pour le lot 1 et affiche un bandeau « Mise à jour de la base requise ».
+- **E-mails non envoyés** tant que la fonction `daily`, la planification et un fournisseur (Resend) ne sont pas configurés ([TACHES-SERVEUR](TACHES-SERVEUR.md)). Les messages restent en file, visibles comme « envoi en attente ».
+- Ni la fonction serveur ni le stockage Supabase n'ont pu être exécutés pendant le développement : leur logique est testée, pas leur déploiement.
+- Modèle de quittance établi d'après les mentions usuelles (loi du 6 juillet 1989, art. 21), **non validé juridiquement** ; le reçu partiel l'indique expressément. Aucun contrat de bail n'est généré.
+- Révision de loyer : seules les échéances générées après la modification du bail en tiennent compte. Une fin de bail avancée annule les échéances suivantes non réglées mais ne recalcule pas le prorata d'un mois déjà généré (à corriger à la main).
+- La réimportation d'une sauvegarde ne restaure pas encore la gestion locative (exportée pour archivage).
+- Pas d'import CSV de relevés bancaires ; pas de régularisation de charges automatisée (saisie d'une somme due).
+
+### Lot 1
 
 - **Création de compte ouverte** tant que l'abonnement (lot 3) n'existe pas : n'importe qui peut créer un compte et utiliser l'application gratuitement.
 - **Pas de projet Supabase ni de navigateur connecté au réseau** pendant ce lot : l'authentification réelle, les appels PostgREST et la reprise sur la base de production n'ont pas été exécutés. Les migrations sont testées sur PostgreSQL 16 avec une émulation minimale de Supabase (`auth.uid()`, rôles). Une recette sur un projet Supabase de test est indispensable avant la production (voir DEPLOIEMENT).
 - La CI installe les vraies dépendances npm ; en local, ce lot a été vérifié avec des versions déjà présentes (React 19.2, TypeScript 6.0, supabase-js 2.117 compilé depuis ses sources). Aucun fichier de verrouillage `package-lock.json` n'a pu être généré : à commiter après le premier `npm install`.
 - Les icônes sont encore celles d'IDF Invest.
 - Copie locale des données (lecture hors connexion) stockée en clair dans le navigateur, effacée à la déconnexion. À éviter sur un appareil partagé sans déconnexion.
-- Taille du script : ~600 Ko minifié (≈170 Ko compressé). Découpage prévu si nécessaire.
+- Taille du script : ~1,2 Mo minifié depuis le lot 2 (génération PDF intégrée), ≈ 350 Ko compressé. Un chargement différé du module PDF est prévu.
 - Le cash-flow « réel » de Mes biens attend les paiements et dépenses (lot 2) ; seul le cash-flow simulé est affiché, et étiqueté comme tel.
 - Les résultats des simulations reprises peuvent différer d'IDF Invest, dont le « mode simplifié » mélangeait loyer charges comprises et charges partielles. Les anciennes valeurs sont conservées dans `inputs.legacy.results`.

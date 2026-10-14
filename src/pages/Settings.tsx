@@ -7,7 +7,9 @@ import { downloadBlob, stamp } from '../domain/exporting.ts';
 import { dateTime } from '../domain/format.ts';
 import { legacyContacts, legacyInputs, legacyProperty, readLegacyLocal, type LegacySimulation } from '../domain/legacy.ts';
 import { DEFAULT_INPUTS, ENGINE_VERSION, normalizeInputs, type SimulationInputs } from '../domain/simulator.ts';
-import { Button, Modal, NumberInput, PageHeader, Section, useConfirm } from '../ui/components.tsx';
+import { Button, Modal, NumberInput, PageHeader, Section, TextArea, TextInput, useConfirm } from '../ui/components.tsx';
+import type { ReminderTemplate } from '../data/types.ts';
+import { DEFAULT_REMINDER_TEMPLATES, TEMPLATE_VARIABLES } from '../domain/rental.ts';
 import { loadSampleData } from './sample.ts';
 
 export function SettingsPage() {
@@ -116,6 +118,8 @@ export function SettingsPage() {
         </div>
       </Section>
 
+      <RentalSettingsSection />
+
       <Section title="Sauvegarde et import">
         <p>Téléchargez une copie complète de vos biens, scénarios, contacts, tâches et échanges au format JSON. Ce fichier peut être réimporté.</p>
         <div className="row">
@@ -126,7 +130,7 @@ export function SettingsPage() {
           </label>
         </div>
         {importError && <p className="form-error" role="alert">{importError}</p>}
-        <p className="muted small">L’import affiche d’abord un aperçu ; les doublons (même bien, même contact) sont ignorés ; une sauvegarde de l’état actuel est téléchargée juste avant.</p>
+        <p className="muted small">L’import affiche d’abord un aperçu ; les doublons (même bien, même contact) sont ignorés ; une sauvegarde de l’état actuel est téléchargée juste avant. La sauvegarde contient aussi la gestion locative (baux, loyers, quittances, dépenses, fiches des documents) ; sa réimportation n’est pas encore disponible et les fichiers eux-mêmes restent dans le stockage.</p>
       </Section>
 
       <Section title="Données IDF Invest">
@@ -185,5 +189,41 @@ export function SettingsPage() {
       </Modal>
       {dialog}
     </>
+  );
+}
+
+function RentalSettingsSection() {
+  const { data, saveSettings, notify } = useStore();
+  const rs = data.settings?.rental_settings ?? {};
+  const [name, setName] = useState(rs.landlord_name ?? '');
+  const [address, setAddress] = useState(rs.landlord_address ?? '');
+  const [tpls, setTpls] = useState<ReminderTemplate[]>(() => (rs.reminder_templates?.length === 3 ? rs.reminder_templates : DEFAULT_REMINDER_TEMPLATES.map((t) => ({ ...t }))));
+  const setTpl = (i: number, k: keyof ReminderTemplate, v: string) => setTpls((x) => x.map((t, j) => (j === i ? { ...t, [k]: v } : t)));
+  const LEVELS = ['Niveau 1 – rappel', 'Niveau 2 – second rappel', 'Niveau 3 – dernier rappel amiable'];
+  return (
+    <Section title="Gestion locative" actions={<>
+      <Button size="sm" onClick={() => setTpls(DEFAULT_REMINDER_TEMPLATES.map((t) => ({ ...t })))}>Modèles d’origine</Button>
+      <Button size="sm" variant="primary" onClick={async () => {
+        if (tpls.some((t) => !t.subject.trim() || !t.body.trim())) { notify('Chaque modèle doit avoir un objet et un message.', 'error'); return; }
+        if (await saveSettings({ rental_settings: { ...rs, landlord_name: name.trim(), landlord_address: address.trim(), reminder_templates: tpls } })) notify('Paramètres de gestion locative enregistrés.');
+      }}>Enregistrer</Button>
+    </>}>
+      <p className="muted small">Identité du bailleur proposée pour chaque nouveau bail (elle figure sur les quittances).</p>
+      <div className="grid">
+        <TextInput label="Nom du bailleur" value={name} onChange={setName} maxLength={200} />
+        <TextInput label="Adresse du bailleur" wide value={address} onChange={setAddress} maxLength={500} />
+      </div>
+      <h3>Modèles de relance amiable</h3>
+      <p className="muted small">Variables : {TEMPLATE_VARIABLES.join(', ')}. Pas de pénalité ni de formule juridique : ces messages restent des rappels amiables, relus avant chaque envoi.</p>
+      {tpls.map((t, i) => (
+        <details key={i} className="tpl" open={i === 0}>
+          <summary>{LEVELS[i]}</summary>
+          <div className="grid">
+            <TextInput label="Objet" wide value={t.subject} onChange={(v) => setTpl(i, 'subject', v)} maxLength={300} />
+            <TextArea label="Message" value={t.body} onChange={(v) => setTpl(i, 'body', v)} rows={8} />
+          </div>
+        </details>
+      ))}
+    </Section>
   );
 }

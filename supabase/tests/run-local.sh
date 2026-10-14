@@ -33,6 +33,7 @@ for m in "$repo"/supabase/migrations/*.sql; do
   PGOPTIONS='-c client_min_messages=warning' psql_run -f "$m" >/dev/null
 done
 psql_run -f "$here/10_rls_and_rules.test.sql" 2>&1 | sed -n 's/^.*NOTICE:  //p; /ERROR/p; /ÉCHEC/p; /Tous les tests/p'
+psql_run -f "$here/30_lot2.test.sql" 2>&1 | sed -n 's/^.*NOTICE:  //p; /ERROR/p; /ÉCHEC/p; /lot 2 passés/p'
 
 echo "→ annulation (rollback)"
 for r in $(ls "$repo"/supabase/rollback/*.down.sql | sort -r); do PGOPTIONS='-c client_min_messages=warning' psql_run -f "$r" >/dev/null; done

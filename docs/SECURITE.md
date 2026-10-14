@@ -11,6 +11,14 @@
 
 Vérifié par `npm run test:db` avec deux comptes (lecture, modification, suppression, création au nom d'autrui, rattachement croisé, accès anonyme).
 
+## Gestion locative (lot 2)
+
+- Toutes les tables locatives sont isolées par utilisateur (RLS + clés étrangères composites), vérifié avec deux comptes.
+- Quittances et file d'e-mails : lecture seule pour l'utilisateur ; écriture uniquement par des fonctions serveur qui vérifient la propriété et les règles (période intégralement réglée, pas de doublon).
+- Journal des tâches et file de suppression de fichiers : aucun accès utilisateur.
+- Documents : bucket privé, chemin imposé `<id utilisateur>/<id document>/<fichier>` (vérifié par la base et par les politiques du stockage), 10 Mo maximum, types limités (PDF, images, Word, Excel, texte), accès par lien signé de 60 secondes. La suppression d'une fiche met le fichier en file de suppression côté serveur.
+- Fonction serveur : appel authentifié par un jeton (`CRON_SECRET`) stocké dans le coffre Supabase ; clé `service_role` uniquement côté serveur ; aucun envoi sans `EMAIL_ENABLED=true` ; journaux sans adresse e-mail ni contenu.
+
 ## Secrets
 
 - Le frontend ne contient que l'URL et la clé **publique** du projet. Le build échoue si la clé fournie est une clé `service_role` ou `sb_secret_`.

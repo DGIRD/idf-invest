@@ -280,8 +280,146 @@ async function main() {
     await page.getByText('Aucune simulation IDF Invest en attente').waitFor();
   });
 
-  await step('rubriques des lots suivants clairement signalées', async () => {
-    for (const r of ['locataires', 'loyers', 'depenses', 'documents', 'synthese', 'abonnement']) {
+  let leaseUrl = '';
+  await step('bail : création avec nouveau locataire, échéances générées', async () => {
+    await page.goto(url + '#/locataires');
+    await page.getByRole('button', { name: 'Nouveau bail' }).click();
+    await page.getByLabel('Bien', { exact: true }).selectOption({ label: 'Parking détenu' });
+    await page.getByRole('button', { name: '+ Nouveau locataire' }).click();
+    const dlg = page.locator('dialog[open]');
+    await dlg.getByLabel('Prénom').fill('Léa');
+    await dlg.getByLabel('Nom *').fill('Martin');
+    await dlg.getByLabel('E-mail').fill('lea@example.test');
+    await dlg.getByRole('button', { name: 'Enregistrer' }).click();
+    await page.locator('.chip.on', { hasText: 'Léa Martin' }).waitFor();
+    const today = await page.evaluate(() => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Paris' }).format(new Date()));
+    const [y, m] = today.split('-').map(Number) as [number, number];
+    const d = new Date(Date.UTC(y, m - 3, 1));
+    const start = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-01`;
+    await page.getByLabel('Début du bail *').fill(start);
+    await page.getByLabel('Jour de paiement').fill('1');
+    assert.match((await page.locator('output.computed').innerText()).replace(/[\u202f\u00a0]/g, ' '), /825,50 €/, 'loyer CC repris du bien');
+    await page.getByRole('button', { name: 'Enregistrer' }).first().click();
+    await page.getByRole('tab', { name: 'Échéances (3)' }).waitFor();
+    leaseUrl = page.url();
+    await page.screenshot({ path: join(out, '13-bail.png'), fullPage: true });
+  });
+
+  await step('paiement : réparti sur plusieurs échéances, partiel', async () => {
+    await page.getByRole('button', { name: 'Enregistrer un paiement' }).first().click();
+    const dlg = page.locator('dialog[open]');
+    await dlg.getByLabel('Montant reçu').fill('1000');
+    await dlg.getByText('Non affecté').count();
+    await dlg.getByRole('button', { name: 'Enregistrer le paiement' }).click();
+    await page.getByText('Paiement enregistré.').waitFor();
+    const rows = page.locator('table.dt-table tbody tr');
+    await page.locator('.status', { hasText: /^Payée$/ }).first().waitFor();
+    assert.equal(await rows.filter({ has: page.locator('.status', { hasText: /^Payée$/ }) }).count(), 1);
+    assert.equal(await rows.filter({ has: page.locator('.status', { hasText: /^Partiel/ }) }).count(), 1);
+    assert.equal(await page.getByRole('button', { name: 'Émettre la quittance' }).count(), 1, 'quittance proposée uniquement pour la période réglée');
+  });
+
+  await step('quittance : émission unique, aperçu et PDF réel', async () => {
+    await page.getByRole('button', { name: 'Émettre la quittance' }).click();
+    const dlg = page.locator('dialog[open]');
+    await dlg.getByRole('heading', { name: /Quittance Q-\d{4}-0001/ }).waitFor();
+    await dlg.locator('iframe.pdf-frame').waitFor();
+    const [pdf] = await Promise.all([page.waitForEvent('download'), dlg.getByRole('button', { name: 'Télécharger le PDF' }).click()]);
+    const buf = await readFile((await pdf.path())!);
+    assert.equal(buf.subarray(0, 5).toString(), '%PDF-');
+    await pdf.saveAs(join(out, 'quittance.pdf'));
+    await dlg.getByRole('button', { name: 'Envoyer au locataire' }).click();
+    await page.getByText(/aucun e-mail n’est envoyé/).first().waitFor();
+    await dlg.getByRole('button', { name: 'Fermer' }).click();
+    assert.equal(await page.getByRole('button', { name: 'Émettre la quittance' }).count(), 0);
+    await page.getByRole('button', { name: /Quittance Q-/ }).waitFor();
+    await page.getByRole('button', { name: 'Reçu partiel' }).click();
+    await page.locator('dialog[open]').getByRole('heading', { name: /Reçu R-\d{4}-0001/ }).waitFor();
+    await page.locator('dialog[open]').getByRole('button', { name: 'Fermer' }).click();
+  });
+
+  await step('confirmation : date du jour proposée par défaut et signalée', async () => {
+    const row = page.locator('table.dt-table tbody tr').first();
+    await row.getByRole('button', { name: 'Confirmer le paiement' }).click();
+    const dlg = page.locator('dialog[open]');
+    await dlg.getByText('Date du jour proposée par défaut').waitFor();
+    await dlg.getByText(/sans confirmation, le loyer reste impayé/).waitFor();
+    await dlg.getByRole('button', { name: 'Confirmer le paiement' }).click();
+    await page.getByText('Paiement confirmé.').waitFor();
+    await page.getByRole('tab', { name: /Paiements/ }).click();
+    await page.getByText('date par défaut').first().waitFor();
+    await page.screenshot({ path: join(out, '14-paiements.png'), fullPage: true });
+  });
+
+  await step('relance amiable : aperçu avant envoi, montant dû', async () => {
+    await page.getByRole('tab', { name: /Relances/ }).click();
+    await page.getByRole('button', { name: 'Préparer une relance' }).click();
+    const dlg = page.locator('dialog[open]');
+    const body = await dlg.getByLabel('Message').inputValue();
+    assert.match(body, /Léa Martin/);
+    assert.match(body.replace(/[\u202f\u00a0]/g, ' '), /651,00 €/, 'reste dû du mois partiellement payé');
+    assert.doesNotMatch(body, /pénalit/i);
+    await dlg.getByRole('button', { name: 'Envoyer par e-mail' }).click();
+    await page.getByText(/Relance mise en file/).waitFor();
+    await page.getByText('Envoi en attente').first().waitFor();
+  });
+
+  await step('dépôt de garantie : suivi séparé', async () => {
+    await page.getByRole('tab', { name: 'Dépôt de garantie' }).click();
+    await page.getByLabel('Montant', { exact: true }).fill('780');
+    await page.getByRole('button', { name: 'Ajouter le mouvement' }).click();
+    await page.locator('.kv').getByText('780,00').first().waitFor();
+    const balance = (await page.locator('.figure', { hasText: 'Solde du locataire' }).innerText()).replace(/[\u202f\u00a0]/g, ' ');
+    assert.match(balance, /-651,00 €/, 'dépôt exclu du solde des loyers');
+  });
+
+  await step('dépenses : saisie, part récupérable, totaux', async () => {
+    await page.goto(url + '#/depenses');
+    await page.getByRole('button', { name: 'Ajouter une dépense' }).first().click();
+    const dlg = page.locator('dialog[open]');
+    await dlg.getByLabel('Bien').selectOption({ label: 'Parking détenu' });
+    await dlg.getByLabel('Catégorie').selectOption('taxe_fonciere');
+    await dlg.getByLabel('Montant TTC').fill('800');
+    await dlg.getByLabel('Part récupérable sur le locataire').fill('900');
+    await dlg.getByRole('button', { name: 'Enregistrer' }).click();
+    await dlg.getByText(/part récupérable doit être comprise/).waitFor();
+    await dlg.getByLabel('Part récupérable sur le locataire').fill('120');
+    await dlg.getByRole('button', { name: 'Enregistrer' }).click();
+    await page.getByText('Dépense enregistrée.').waitFor();
+    assert.match((await page.locator('.figure').first().innerText()).replace(/[\u202f\u00a0]/g, ' '), /800,00 €/);
+  });
+
+  await step('documents : dépôt privé, contrôle du type', async () => {
+    await page.goto(url + '#/documents');
+    await page.getByRole('button', { name: 'Ajouter un document' }).first().click();
+    const dlg = page.locator('dialog[open]');
+    await dlg.locator('#doc-file').setInputFiles({ name: 'virus.exe', mimeType: 'application/x-msdownload', buffer: Buffer.from('MZ') });
+    await dlg.getByText(/Type de fichier non accepté/).waitFor();
+    await dlg.locator('#doc-file').setInputFiles({ name: 'bail-signe.pdf', mimeType: 'application/pdf', buffer: await readFile(join(out, 'quittance.pdf')) });
+    await dlg.getByLabel('Catégorie').selectOption('bail');
+    await dlg.getByLabel('Bien').selectOption({ label: 'Parking détenu' });
+    await dlg.getByRole('button', { name: 'Ajouter', exact: true }).click();
+    await page.getByText('Document ajouté.').waitFor();
+    await page.getByRole('button', { name: 'bail-signe' }).waitFor();
+  });
+
+  await step('Mes biens : locataire actif, « Loué », encaissements et cash-flow réel', async () => {
+    await page.goto(url + '#/biens');
+    const row = page.locator('tbody tr', { hasText: 'Parking détenu' });
+    await row.waitFor();
+    const text = (await row.innerText()).replace(/[\u202f\u00a0]/g, ' ');
+    assert.match(text, /Loué/);
+    assert.match(text, /Léa Martin/);
+    await page.screenshot({ path: join(out, '15-mes-biens-gestion.png') });
+    await page.goto(url + '#/loyers');
+    await page.getByRole('heading', { name: 'Loyers et paiements' }).waitFor();
+    await page.screenshot({ path: join(out, '16-loyers.png'), fullPage: true });
+    await page.goto(url);
+    await page.getByText('Loyers impayés échus').waitFor();
+  });
+
+  await step('rubriques du lot 3 clairement signalées', async () => {
+    for (const r of ['synthese', 'abonnement']) {
       await page.goto(url + `#/${r}`);
       await page.getByText(/n’est pas encore disponible/).waitFor();
     }
@@ -292,7 +430,8 @@ async function main() {
     const mp = await m.newPage();
     await mp.goto(url);
     await mp.evaluate((s) => localStorage.setItem('immozen:demo:v1', s), await page.evaluate(() => localStorage.getItem('immozen:demo:v1')!));
-    for (const [path, shot] of [['', '07-mobile-tableau-de-bord'], ['#/prospection', '08-mobile-prospection'], ['#/simulateur', '09-mobile-simulateur'], [`#/bien/${propertyId}`, '10-mobile-fiche']] as const) {
+    const leasePath = leaseUrl ? '#' + leaseUrl.split('#')[1] : '#/locataires';
+    for (const [path, shot] of [['', '07-mobile-tableau-de-bord'], ['#/prospection', '08-mobile-prospection'], ['#/simulateur', '09-mobile-simulateur'], [`#/bien/${propertyId}`, '10-mobile-fiche'], [leasePath, '17-mobile-bail'], ['#/loyers', '18-mobile-loyers']] as const) {
       await mp.goto(url + path);
       await mp.reload();
       await mp.locator('main h1').first().waitFor();

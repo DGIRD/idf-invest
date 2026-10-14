@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { DEFAULT_INPUTS, normalizeInputs, type SimulationInputs } from '../domain/simulator.ts';
-import { describeError, RepoError, type Repo, type SessionInfo, type Snapshot } from './repo.ts';
+import { describeError, EMPTY_SNAPSHOT, RepoError, SNAPSHOT_KEY, type Repo, type SessionInfo, type Snapshot } from './repo.ts';
 import type { Insert, Patch, Tables, TableName, UserSettings, VersionedTable } from './types.ts';
 
 export type SyncState = 'loading' | 'synced' | 'saving' | 'offline' | 'error';
@@ -33,17 +33,19 @@ interface StoreValue {
   createMany<T extends TableName>(table: T, rows: Insert<Tables[T]>[]): Promise<Tables[T][] | null>;
   update<T extends VersionedTable>(table: T, current: Tables[T], patch: Patch<Tables[T]>, label?: string): Promise<Tables[T] | null>;
   remove(table: TableName, id: string): Promise<boolean>;
-  saveSettings(patch: Partial<Pick<UserSettings, 'simulator_defaults' | 'ui_prefs'>>): Promise<boolean>;
+  saveSettings(patch: Partial<Pick<UserSettings, 'simulator_defaults' | 'ui_prefs' | 'rental_settings'>>): Promise<boolean>;
+  /** Appel d'une fonction serveur (échéances, quittances, relances…) puis rechargement des données. */
+  call<R>(fn: (repo: Repo) => Promise<R>, success?: string): Promise<R | null>;
+  removeWhere(table: TableName, match: Record<string, string>): Promise<boolean>;
+  updateWhere<T extends TableName>(table: T, match: Record<string, string>, patch: Patch<Tables[T]>): Promise<boolean>;
   signOut(): Promise<void>;
 }
 
-const EMPTY: Snapshot = { properties: [], scenarios: [], contacts: [], tasks: [], events: [], settings: null, loadedAt: '' };
+const EMPTY: Snapshot = EMPTY_SNAPSHOT;
 const CACHE_PREFIX = 'immozen:cache:';
 const Ctx = createContext<StoreValue | null>(null);
 
-const listKey: Record<TableName, keyof Omit<Snapshot, 'settings' | 'loadedAt'>> = {
-  properties: 'properties', scenarios: 'scenarios', pro_contacts: 'contacts', property_tasks: 'tasks', timeline_events: 'events',
-};
+const listKey = SNAPSHOT_KEY;
 
 /** Supprime toute copie locale de données privées (déconnexion). */
 export function purgePrivateCache() {
@@ -129,7 +131,7 @@ export function StoreProvider({ repo, children }: { repo: Repo; children: ReactN
     if (repo.mode !== 'demo') {
       try {
         const raw = localStorage.getItem(CACHE_PREFIX + session.userId);
-        if (raw) setData(JSON.parse(raw) as Snapshot);
+        if (raw) setData({ ...EMPTY, ...(JSON.parse(raw) as Partial<Snapshot>) });
       } catch { /* cache illisible : ignoré */ }
     }
     void refresh();
@@ -181,6 +183,7 @@ export function StoreProvider({ repo, children }: { repo: Repo; children: ReactN
 
   const create = useCallback(async <T extends TableName>(table: T, row: Insert<Tables[T]>) => {
     const rec = await run(() => repo.insert(table, row));
+    refreshAfter(table, rec);
     if (rec) {
       upsertLocal(table, [rec]);
       // les déclencheurs serveur ajoutent de l'historique : on le relit sans bloquer
@@ -189,11 +192,17 @@ export function StoreProvider({ repo, children }: { repo: Repo; children: ReactN
     return rec;
   }, [repo, run, upsertLocal, commit]);
 
+  // Effets serveur (quittance automatique, file d'e-mails…) : rechargement complet
+  const refreshAfter = useCallback(<T,>(table: TableName, r: T) => {
+    if (r && ['payment_allocations', 'payments', 'leases', 'rent_charges', 'lease_tenants'].includes(table)) void refresh();
+    return r;
+  }, [refresh]);
+
   const createMany = useCallback(async <T extends TableName>(table: T, rows: Insert<Tables[T]>[]) => {
     const recs = await run(() => repo.insertMany(table, rows));
     if (recs) upsertLocal(table, recs);
-    return recs;
-  }, [repo, run, upsertLocal]);
+    return refreshAfter(table, recs);
+  }, [repo, run, upsertLocal, refreshAfter]);
 
   const askConflict = useCallback((table: VersionedTable, label: string) =>
     new Promise<'reload' | 'overwrite'>((resolve) => setConflict({ table, label, resolve: (c) => { setConflict(null); resolve(c); } })), []);
@@ -244,11 +253,33 @@ export function StoreProvider({ repo, children }: { repo: Repo; children: ReactN
         }
         return next;
       });
+      if (['properties', 'leases', 'payments', 'tenants', 'documents', 'rent_charges', 'payment_allocations'].includes(table)) void refresh();
     }
     return !!ok;
-  }, [repo, run, commit]);
+  }, [repo, run, commit, refresh]);
 
-  const saveSettings = useCallback(async (patch: Partial<Pick<UserSettings, 'simulator_defaults' | 'ui_prefs'>>) => {
+  const removeWhere = useCallback(async (table: TableName, match: Record<string, string>) => {
+    const ok = await run(async () => { await repo.removeWhere(table, match); return true; });
+    if (ok) void refresh();
+    return !!ok;
+  }, [repo, run, refresh]);
+
+  const updateWhere = useCallback(async <T extends TableName>(table: T, match: Record<string, string>, patch: Patch<Tables[T]>) => {
+    const ok = await run(async () => { await repo.updateWhere(table, match, patch); return true; });
+    if (ok) void refresh();
+    return !!ok;
+  }, [repo, run, refresh]);
+
+  const call = useCallback(async <R,>(fn: (r: Repo) => Promise<R>, success?: string) => {
+    const out = await run(() => fn(repo));
+    if (out !== null) {
+      if (success) notify(success);
+      await refresh();
+    }
+    return out;
+  }, [repo, run, notify, refresh]);
+
+  const saveSettings = useCallback(async (patch: Partial<Pick<UserSettings, 'simulator_defaults' | 'ui_prefs' | 'rental_settings'>>) => {
     const version = data.settings?.version ?? 1;
     const res = await run(() => repo.saveSettings(version, patch));
     if (!res) return false;
@@ -271,7 +302,7 @@ export function StoreProvider({ repo, children }: { repo: Repo; children: ReactN
 
   const value: StoreValue = {
     repo, session, authReady, data, sync, conflict, toasts, simulatorDefaults,
-    notify, dismissToast, refresh, create, createMany, update, remove, saveSettings, signOut,
+    notify, dismissToast, refresh, create, createMany, update, remove, removeWhere, updateWhere, call, saveSettings, signOut,
   };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

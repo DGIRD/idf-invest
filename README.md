@@ -4,7 +4,7 @@
 
 Application web progressive (PWA) de prospection immobilière et de gestion locative pour particuliers. Elle succède à **IDF Invest**, dont les données sont reprises.
 
-> **État : lot 1 livré** (socle, prospection, Mes biens, simulateur, contacts, reprise IDF Invest). Les rubriques des lots 2 et 3 sont visibles dans le menu mais signalées « non disponibles ». Détail exact : [docs/ETAT-DU-PROJET.md](docs/ETAT-DU-PROJET.md).
+> **État : lots 1 et 2 livrés** (prospection, Mes biens, simulateur, contacts, reprise IDF Invest ; locataires et baux, loyers et paiements, quittances, relances, dépenses, documents). Les rubriques du lot 3 (synthèse annuelle, abonnement, administration) sont signalées « non disponibles ». Détail exact : [docs/ETAT-DU-PROJET.md](docs/ETAT-DU-PROJET.md).
 
 ## Démarrer en local
 
@@ -36,6 +36,7 @@ npm run build && npm run test:e2e   # parcours navigateur bureau et mobile, capt
 | [DEPLOIEMENT](docs/DEPLOIEMENT.md) | Mise en service pas à pas, sauvegarde et restauration |
 | [GUIDE-UTILISATEUR](docs/GUIDE-UTILISATEUR.md) | Utilisation de l'application |
 | [SERVICES-A-CONNECTER](docs/SERVICES-A-CONNECTER.md) | Supabase, Stripe, e-mails… |
+| [TACHES-SERVEUR](docs/TACHES-SERVEUR.md) | Tâches planifiées, e-mails, garde-fous, mise en route |
 | [TESTS](docs/TESTS.md) | Ce qui est testé et derniers résultats |
 
 L'ancienne application est conservée, non publiée, dans `legacy/idf-invest/` pour référence.

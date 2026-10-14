@@ -1,13 +1,13 @@
 # Tests et résultats
 
-Exécution du 13/10/2026 sur la branche `immo-zen`.
+Exécution du 14/10/2026 sur la branche `lot-2`.
 
 | Suite | Commande | Résultat |
 |---|---|---|
 | Typage strict (`strict`, `noUncheckedIndexedAccess`) | `npm run typecheck` | 0 erreur |
-| Unitaires : simulateur (15), règles des biens, reprise locale, sauvegarde/import, CSV, XLSX relu par openpyxl (8) | `npm test` | **23/23** |
-| SQL : reprise (16), isolation entre deux comptes (13), règles métier et concurrence (16), création de compte (2), annulation et ré-application (5) | `npm run test:db` | **52/52** |
-| Navigateur (Chromium, bureau 1360 px et mobile 390 px, mode démonstration) | `npm run build && npm run test:e2e` | **20/20 étapes** |
+| Unitaires : simulateur (15), règles des biens, reprise, sauvegarde/import, CSV, XLSX (8), gestion locative et quittance PDF (11), file d'e-mails (7) | `npm test` | **41/41** |
+| SQL lot 1 : reprise (16), isolation (13), règles et concurrence (16), compte (2), annulation (5) ; lot 2 : baux, échéances, paiements, quittances, relances, documents, dépenses, isolation, tâches quotidiennes, file d'e-mails (61) | `npm run test:db` | **113/113** |
+| Navigateur (Chromium, bureau 1360 px et mobile 390 px, mode démonstration) | `npm run build && npm run test:e2e` | **29/29 étapes** |
 
 ## Couverture des exigences minimales
 
@@ -21,6 +21,9 @@ Exécution du 13/10/2026 sur la branche `immo-zen`.
 | Imports et exports | unitaires + e2e |
 | Rendu mobile | e2e (aucun défilement horizontal, cartes, menu) + captures |
 | Absence des états des lieux | e2e (menu, routes, code livré) |
-| Paiements partiels, quittances, doublons d'envoi, abonnement | lots 2-3 |
+| Paiements partiels et trop-perçus | SQL + unitaires + e2e |
+| Impossibilité de quittancer un impayé | SQL + e2e |
+| Prévention des doublons (échéances, quittances, e-mails) | SQL + unitaires |
+| Abonnement et expiration | lot 3 |
 
 Les captures d'écran sont produites dans `test-results/` (artefact de la CI).
