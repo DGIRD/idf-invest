@@ -57,7 +57,7 @@ Légende : **Implémenté et testé** = code livré et couvert par un test autom
 | Simulateur → prospection : une simulation sans bien crée un bien « Repéré » ; le scénario principal met à jour prix, surface, travaux et loyer du bien en prospection | Implémenté et testé | unitaires + e2e |
 | Mes biens : crédit (montant, taux, durée, première échéance, assurance, mensualité saisie ou calculée), capital restant dû | Implémenté et testé | unitaires + e2e |
 | Cash-flow prévisionnel par bien détenu et au tableau de bord : loyer CC (bail en cours sinon loyer saisi) − charges annuelles / 12 − crédit ; à défaut de données, simulation principale | Implémenté et testé | unitaires + e2e |
-| Adresse de l'application : https://dgird.github.io/immo-zen/ ; icônes Immo-Zen | Implémenté | — |
+| Icônes Immo-Zen ; adresse https://dgird.github.io/immo-zen/ | Implémenté (icônes) / **à configurer** (renommer le dépôt, voir DEPLOIEMENT) | — |
 | Exports .xlsx / CSV des échéances, paiements, dépenses ; sauvegarde JSON incluant la gestion locative | Implémenté | — |
 
 ## Restant
