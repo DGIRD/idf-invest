@@ -2,7 +2,7 @@
 
 ## Se connecter
 
-Utilisez le même e-mail et le même mot de passe qu'avec IDF Invest : vos simulations ont été reprises en biens de prospection. « Mot de passe oublié » envoie un lien de réinitialisation. Sur téléphone ou ordinateur, le navigateur propose d'**installer** l'application (icône sur l'écran d'accueil).
+Utilisez le même e-mail et le même mot de passe qu'avec l'ancienne version : vos simulations ont été reprises en biens de prospection. « Mot de passe oublié » envoie un lien de réinitialisation. Sur téléphone ou ordinateur, le navigateur propose d'**installer** l'application (icône sur l'écran d'accueil).
 
 L'indicateur en haut à droite montre l'état : *Synchronisé*, *Enregistrement…*, *Hors connexion* ou *Erreur*. Cliquez dessus pour resynchroniser. Hors connexion, vous consultez la dernière version chargée mais ne pouvez rien modifier.
 
@@ -22,11 +22,11 @@ Bouton **Marquer comme acquis** (ou statut « Acquis »). Après confirmation, l
 
 ## Mes biens
 
-Les biens détenus, acquis depuis la prospection ou ajoutés directement (**Ajouter un bien détenu**) : mode de détention, régime fiscal renseigné, date et coût d'acquisition, occupation, loyer et provision, et **charges annuelles** (taxe foncière, copropriété, assurance PNO, gestion locative, GLI, autres) avec leur total ; elles pré-remplissent les simulations du bien. Voir plus bas « Mes biens » pour le suivi locatif.
+Les biens détenus, acquis depuis la prospection ou ajoutés directement (**Ajouter un bien détenu**) : mode de détention, régime fiscal renseigné, date et coût d'acquisition, occupation, loyer et provision, et **charges annuelles** (taxe foncière, copropriété, assurance PNO, gestion locative, GLI, autres) avec leur total ; elles pré-remplissent les simulations du bien. Section **Crédit** : montant, taux, durée, date de première échéance, assurance (€/mois) ; la mensualité est calculée, ou saisie si vous la connaissez. Le bouton « Reprendre le crédit de la simulation » recopie le crédit du scénario figé à l'acquisition. Le **cash-flow prévisionnel** du bien (fiche, tableau Mes biens, tableau de bord) = loyer charges comprises (celui du bail en cours, sinon le loyer saisi) − charges annuelles / 12 − mensualité de crédit, avant impôts. Sans loyer ni charge saisis, il reprend la simulation principale. Voir plus bas « Mes biens » pour le suivi locatif.
 
 ## Simulateur
 
-Accessible seul ou depuis un bien (pré-rempli avec prix, travaux et loyer estimé). Les résultats se mettent à jour à chaque saisie. Indiquez si le prix inclut les honoraires d'agence pour éviter de les compter deux fois. Enregistrez plusieurs scénarios par bien ; le premier devient le **scénario principal** (modifiable dans l'onglet Simulations de la fiche), utilisé dans les tableaux et la comparaison. Le tableau d'amortissement s'affiche par année ou par mois et s'exporte en Excel. « Méthode de calcul » détaille les formules. Les valeurs par défaut se règlent dans **Paramètres**.
+Accessible seul ou depuis un bien (pré-rempli avec prix, travaux et loyer estimé). **Le simulateur alimente la prospection** : une simulation enregistrée sans bien choisi crée un bien « Repéré » (donnez-lui un titre), avec les prix, la surface, les travaux et le loyer simulés ; pour un bien déjà en prospection, le scénario principal met à jour ces valeurs sur sa fiche. Les résultats se mettent à jour à chaque saisie. Indiquez si le prix inclut les honoraires d'agence pour éviter de les compter deux fois. Enregistrez plusieurs scénarios par bien ; le premier devient le **scénario principal** (modifiable dans l'onglet Simulations de la fiche), utilisé dans les tableaux et la comparaison. Le tableau d'amortissement s'affiche par année ou par mois et s'exporte en Excel. « Méthode de calcul » détaille les formules. Les valeurs par défaut se règlent dans **Paramètres**.
 
 Le **prix de présentation FAI** permet de calculer la négociation (en euros et en %) par rapport au prix proposé, frais d'agence compris. Le **loyer hors charges** se calcule à partir de la surface et d'un loyer au m² **bas** ou **haut** (sélecteur), ou se saisit librement ; le **loyer charges comprises** y ajoute la provision. En saisissant les charges de copropriété, la part récupérable et la provision sont proposées à 80 % (arrondies à l'euro supérieur) et restent modifiables. L'assurance PNO est proposée à 99 € par an.
 
@@ -76,7 +76,7 @@ Agences, agents, artisans, notaires, banques… avec coordonnées, organisme, se
 
 - Chaque tableau s'exporte en Excel (.xlsx), CSV (séparateur « ; », pour Excel en français) ou JSON.
 - **Paramètres → Télécharger une sauvegarde** : tout votre compte en un fichier JSON. **Importer une sauvegarde** affiche un aperçu, ignore les doublons et télécharge d'abord une sauvegarde de l'état actuel.
-- **Données IDF Invest** : si des simulations de l'ancienne application n'avaient jamais été synchronisées depuis ce navigateur, elles sont proposées ici pour reprise.
+- **Données de l'ancienne version** : si des simulations de l'ancienne application n'avaient jamais été synchronisées depuis ce navigateur, elles sont proposées ici pour reprise.
 
 ## Déconnexion
 

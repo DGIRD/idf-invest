@@ -64,7 +64,7 @@ export const CHANNEL_LABELS: Record<Channel, string> = {
 
 export const EVENT_LABELS: Record<EventKind, string> = {
   creation: 'Création', status_change: 'Statut', acquisition: 'Acquisition', exchange: 'Échange',
-  note: 'Note', visit: 'Visite', migration: 'Reprise IDF Invest',
+  note: 'Note', visit: 'Visite', migration: 'Reprise de l’ancienne version',
 };
 
 export const DPE_VALUES = ['A', 'B', 'C', 'D', 'E', 'F', 'G'] as const;

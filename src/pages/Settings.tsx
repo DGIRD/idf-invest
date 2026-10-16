@@ -65,7 +65,7 @@ export function SettingsPage() {
   }
 
   async function importLegacy(list: LegacySimulation[]) {
-    if (!(await ask('Reprendre les simulations IDF Invest', <>{list.length} simulation(s) trouvée(s) dans ce navigateur et absente(s) de votre compte seront ajoutées à la prospection, avec un scénario chacune. Une sauvegarde de votre compte est téléchargée avant l’opération.</>, 'Reprendre', false))) return;
+    if (!(await ask('Reprendre les simulations de l’ancienne version', <>{list.length} simulation(s) trouvée(s) dans ce navigateur et absente(s) de votre compte seront ajoutées à la prospection, avec un scénario chacune. Une sauvegarde de votre compte est téléchargée avant l’opération.</>, 'Reprendre', false))) return;
     setBusy(true);
     try {
       backupNow();
@@ -85,12 +85,12 @@ export function SettingsPage() {
         }
         const prop = await store.create('properties', { ...legacyProperty(s), agency_id: agencyId, agent_id: agentId });
         if (!prop) return;
-        const sc = await store.create('scenarios', { property_id: prop.id, name: `Simulation IDF Invest ${s.number ?? ''}`.trim(), inputs: legacyInputs(s), engine_version: 'legacy-idf-invest' });
+        const sc = await store.create('scenarios', { property_id: prop.id, name: `Simulation reprise ${s.number ?? ''}`.trim(), inputs: legacyInputs(s), engine_version: 'legacy-idf-invest' });
         if (sc) await store.update('properties', prop, { primary_scenario_id: sc.id }, 'Le bien repris');
         n++;
       }
       await store.refresh();
-      notify(`${n} simulation(s) IDF Invest reprise(s).`);
+      notify(`${n} simulation(s) de l’ancienne version reprise(s).`);
     } finally {
       setBusy(false);
     }
@@ -134,15 +134,15 @@ export function SettingsPage() {
         <p className="muted small">L’import affiche d’abord un aperçu ; les doublons (même bien, même contact) sont ignorés ; une sauvegarde de l’état actuel est téléchargée juste avant. La sauvegarde contient aussi la gestion locative (baux, loyers, quittances, dépenses, fiches des documents) ; sa réimportation n’est pas encore disponible et les fichiers eux-mêmes restent dans le stockage.</p>
       </Section>
 
-      <Section title="Données IDF Invest">
-        <p>Les simulations enregistrées en ligne dans IDF Invest sont reprises automatiquement lors de la mise en service (biens en prospection, scénarios et contacts agence/agent).</p>
+      <Section title="Données de l’ancienne version">
+        <p>Les simulations enregistrées en ligne dans l’ancienne version sont reprises automatiquement lors de la mise en service (biens en prospection, scénarios et contacts agence/agent).</p>
         {legacy.length > 0 ? (
           <div className="note">
-            <p>{legacy.length} simulation(s) IDF Invest sont présentes dans ce navigateur mais absentes de votre compte (enregistrées hors connexion dans l’ancienne application).</p>
+            <p>{legacy.length} simulation(s) de l’ancienne version sont présentes dans ce navigateur mais absentes de votre compte (enregistrées hors connexion dans l’ancienne application).</p>
             <ul className="plain small">{legacy.slice(0, 8).map((s) => <li key={s.id}>{String(s.title ?? s.number ?? s.id)}</li>)}{legacy.length > 8 && <li>…</li>}</ul>
             <Button variant="primary" disabled={busy} onClick={() => void importLegacy(legacy)}>Reprendre ces simulations</Button>
           </div>
-        ) : <p className="muted small">Aucune simulation IDF Invest en attente dans ce navigateur.</p>}
+        ) : <p className="muted small">Aucune simulation de l’ancienne version en attente dans ce navigateur.</p>}
       </Section>
 
       <Section title="Compte">

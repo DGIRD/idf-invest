@@ -19,6 +19,14 @@ Frais de notaire 7,5 % · frais d'agence 10 000 € · crédit 3,5 % · 20 ans �
 - **Loyer charges comprises** = loyer hors charges + provision sur charges.
 - **Charges de copropriété** : la part récupérable (par an) et la provision (par mois) sont proposées à 80 % du montant, en euros entiers arrondis au supérieur (ex. 1 000 € → 800 €/an et 67 €/mois). Une valeur modifiée à la main n'est plus recalculée.
 
+## Biens détenus : crédit et cash-flow prévisionnel
+
+Source : `src/domain/property.ts` (`loanInfo`, `ownedCashflow`).
+
+- **Mensualité** = mensualité saisie, sinon montant × t / (1 − (1 + t)<sup>−n</sup>), t = taux / 12, n = durée en mois. Assurance en €/mois.
+- **Capital restant dû** : selon le tableau d'amortissement, après les échéances écoulées depuis la première ; nul après la fin du crédit (mensualité alors comptée à 0).
+- **Cash-flow mensuel** = loyer charges comprises (baux en cours, sinon loyer + provision saisis) − total des charges annuelles / 12 − mensualité assurance comprise. Sans crédit saisi, la mensualité de la simulation principale est utilisée ; sans loyer ni charge saisis, le cash-flow de la simulation principale. Ni vacance ni impôts.
+
 ## Acquisition
 
 - **Prix hors honoraires** = prix proposé (mode « hors honoraires ») ou prix proposé − honoraires (mode « honoraires inclus »). Refus si les honoraires dépassent le prix.

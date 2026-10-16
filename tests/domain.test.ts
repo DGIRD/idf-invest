@@ -52,7 +52,7 @@ test('prix au m² : prix proposé prioritaire, sinon prix affiché', () => {
   assert.equal(pricePerM2({ surface: null, offer_price: 1, asking_price: 1 }), null);
 });
 
-test('reprise IDF Invest locale : même conversion que la migration SQL', () => {
+test('reprise locale de l’ancienne version : même conversion que la migration SQL', () => {
   const s = { id: 'x', number: 'SIM-1', title: 'T2', status: 'Visite programmée', surface: 42, rentM2Low: 22, rentM2High: 26, rentLevel: 'Moyen', dpe: 'Z', listingUrl: 'ftp://x', notaryFees: 16125, offerPrice: 215000, archived: true, agency: 'Agence du Parc', agentEmail: 'Claire@A.test' };
   assert.equal(legacyRent(s), 1008);
   const p = legacyProperty(s);
@@ -127,4 +127,37 @@ test('Excel : vrai classeur .xlsx lisible par une bibliothèque tierce (openpyxl
     return; // openpyxl absent : vérification ignorée
   }
   assert.match(out, /^Biens \['Été & <test>', 215000\.5, datetime\.datetime\(2026, 10, 13, 0, 0\), 4\.87\] dd\/mm\/yyyy/);
+});
+
+test('crédit d’un bien détenu : mensualité calculée, capital restant dû, fin du crédit', async () => {
+  const { loanInfo } = await import('../src/domain/property.ts');
+  const l = loanInfo({ loan_amount: 200000, loan_rate: 3.5, loan_years: 20, loan_start_date: '2026-01-05', loan_insurance_monthly: 50 }, '2026-10-16')!;
+  assert.equal(l.payment, 1159.92);
+  assert.equal(l.monthlyTotal, 1209.92);
+  assert.equal(l.endDate, '2046-01-05');
+  assert.ok(l.remaining! < 200000 && l.remaining! > 190000, '10 échéances payées');
+  assert.equal(loanInfo({ loan_amount: 100000, loan_monthly_payment: 700, loan_years: 15 }, '2026-10-16')!.payment, 700, 'mensualité saisie prioritaire');
+  assert.equal(loanInfo({ loan_amount: 100000, loan_rate: 2, loan_years: 1, loan_start_date: '2020-01-01' }, '2026-10-16')!.monthlyTotal, 0, 'crédit terminé');
+  assert.equal(loanInfo({}, '2026-10-16'), null);
+});
+
+test('cash-flow d’un bien détenu : loyer CC − charges annuelles / 12 − crédit', async () => {
+  const { ownedCashflow } = await import('../src/domain/property.ts');
+  const p = { estimated_rent: 900, charges_provision: 60, property_tax_annual: 1200, copro_charges_annual: 1200, loan_amount: 100000, loan_monthly_payment: 500, loan_insurance_monthly: 20 } as never;
+  const cf = ownedCashflow(p, [], null, '2026-10-16')!;
+  assert.equal(cf.monthly, 960 - 200 - 520);
+  assert.equal(cf.source, 'bien');
+  const withLease = ownedCashflow(p, [{ rent_hc: 1000, charges_amount: 80 }], null, '2026-10-16')!;
+  assert.equal(withLease.income, 1080, 'le bail en cours prime sur le loyer saisi');
+  assert.equal(ownedCashflow({} as never, [], null, '2026-10-16'), null, 'sans donnée : pas de chiffre inventé');
+});
+
+test('le simulateur alimente la fiche du bien en prospection', async () => {
+  const { prospectFieldsFromSimulation } = await import('../src/domain/property.ts');
+  const { DEFAULT_INPUTS, simulate } = await import('../src/domain/simulator.ts');
+  const i = { ...DEFAULT_INPUTS, askingPrice: 250000, price: 230000, surface: 40, rentMode: 'haut' as const, rentM2Low: 20, rentM2High: 25, works: 0 };
+  const out = simulate(i);
+  assert.ok(out.ok);
+  if (!out.ok) return;
+  assert.deepEqual(prospectFieldsFromSimulation(i, out.result), { asking_price: 250000, offer_price: 230000, surface: 40, estimated_rent: 1000 });
 });

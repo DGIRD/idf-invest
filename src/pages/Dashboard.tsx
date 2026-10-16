@@ -3,8 +3,8 @@ import { useStore } from '../data/store.tsx';
 import type { PropertyStatus } from '../data/types.ts';
 import { date, dateTime, money, todayParis } from '../domain/format.ts';
 import { STATUS_LABELS, statusTone } from '../domain/labels.ts';
-import { isOwned, metrics } from '../domain/property.ts';
-import { chargeViews } from '../domain/rental.ts';
+import { isOwned, metrics, ownedCashflow } from '../domain/property.ts';
+import { chargeViews, propertyRentalSummary } from '../domain/rental.ts';
 import { Button, EmptyState, PageHeader, Section } from '../ui/components.tsx';
 import { href, navigate } from '../ui/router.ts';
 
@@ -25,8 +25,16 @@ export function DashboardPage() {
       .sort((a, b) => a.visit_at!.localeCompare(b.visit_at!));
     const tasks = data.tasks.filter((t) => !t.done_at && t.due_date && t.due_date <= in7).sort((a, b) => a.due_date!.localeCompare(b.due_date!));
     const contactFollow = data.contacts.filter((c) => !c.archived_at && c.next_follow_up && c.next_follow_up <= today);
-    const ownedCash = owned.reduce((a, p) => a + (metrics(p, data.scenarios, simulatorDefaults).result?.cashflowMonthlyYear1 ?? 0), 0);
-    const ownedRent = owned.reduce((a, p) => a + (p.estimated_rent ?? 0), 0);
+    // Cash-flow prévisionnel : loyer charges comprises − charges annuelles / 12 − crédit, par bien détenu
+    const rental = { leases: data.leases, leaseTenants: data.leaseTenants, tenants: data.tenants, charges: data.charges, payments: data.payments, allocations: data.allocations, expenses: data.expenses };
+    const flows = owned.map((p) => {
+      const rs = propertyRentalSummary(p.id, Number(today.slice(0, 4)), today, rental);
+      return { p, rs, cf: ownedCashflow(p, rs.activeLeases, metrics(p, data.scenarios, simulatorDefaults).result, today) };
+    });
+    const known = flows.filter((f) => f.cf);
+    const ownedCash = Math.round(known.reduce((a, f) => a + f.cf!.monthly, 0) * 100) / 100;
+    const ownedRent = flows.reduce((a, f) => a + (f.rs.activeLeases.length ? f.rs.activeLeases.reduce((x, l) => x + l.rent_hc, 0) : f.p.estimated_rent ?? 0), 0);
+    const cashUnknown = owned.length - known.length;
     const offers = prospects.filter((p) => ['offre_transmise', 'negociation', 'offre_acceptee', 'sous_compromis'].includes(p.status)).length;
     const views = chargeViews(data.charges, data.allocations, today);
     const overdue = views.filter((v) => v.overdue);
@@ -40,7 +48,7 @@ export function DashboardPage() {
       const l = data.leases.find((x) => x.id === leaseId);
       return data.properties.find((p) => p.id === l?.property_id)?.title ?? 'Bail';
     };
-    return { prospects, owned, counts, followUps, visits, tasks, contactFollow, ownedCash, ownedRent, offers, overdue, overdueSum, toReceipt, drafts, received, expensesToPay, leaseTitle };
+    return { cashUnknown, prospects, owned, counts, followUps, visits, tasks, contactFollow, ownedCash, ownedRent, offers, overdue, overdueSum, toReceipt, drafts, received, expensesToPay, leaseTitle };
   }, [data, today, in7, simulatorDefaults]);
 
   const max = Math.max(1, ...v.counts.map(([, n]) => n));
@@ -52,7 +60,7 @@ export function DashboardPage() {
       {empty ? (
         <EmptyState title="Commencez par un premier bien"
           action={<div className="row"><Button variant="primary" onClick={() => navigate('/bien/nouveau?mode=prospect')}>Ajouter un bien en prospection</Button><Button onClick={() => navigate('/simulateur')}>Faire une simulation</Button></div>}>
-          Repérez une annonce, lancez une simulation, puis suivez vos échanges jusqu’à l’acquisition. Vous reprenez des données d’IDF Invest ? Voir Paramètres.
+          Repérez une annonce, lancez une simulation, puis suivez vos échanges jusqu’à l’acquisition. Vous aviez des simulations dans l’ancienne version ? Voir Paramètres.
         </EmptyState>
       ) : (
         <>
@@ -60,7 +68,9 @@ export function DashboardPage() {
             <a className="figure link-figure" href={href('/prospection')}><span className="figure-label">En prospection</span><span className="figure-value">{v.prospects.length}</span><span className="figure-hint">dont {v.offers} offre{v.offers > 1 ? 's' : ''} en cours</span></a>
             <a className="figure link-figure" href={href('/prospection')}><span className="figure-label">Relances à faire</span><span className={`figure-value ${v.followUps.length ? 'neg' : ''}`}>{v.followUps.length + v.contactFollow.length}</span><span className="figure-hint">biens et contacts</span></a>
             <a className="figure link-figure" href={href('/biens')}><span className="figure-label">Biens détenus</span><span className="figure-value">{v.owned.length}</span><span className="figure-hint">loyers estimés {money(v.ownedRent)} / mois</span></a>
-            <div className="figure"><span className="figure-label">Cash-flow prévisionnel</span><span className={`figure-value ${v.ownedCash >= 0 ? 'pos' : 'neg'}`}>{money(v.ownedCash)}</span><span className="figure-hint">par mois, biens détenus, d’après les simulations</span></div>
+            <a className="figure link-figure" href={href('/biens')}><span className="figure-label">Cash-flow prévisionnel</span>
+              <span className={`figure-value ${v.owned.length === v.cashUnknown ? '' : v.ownedCash >= 0 ? 'pos' : 'neg'}`}>{v.owned.length === v.cashUnknown ? '—' : money(v.ownedCash)}</span>
+              <span className="figure-hint">{v.owned.length === 0 ? 'aucun bien détenu' : v.cashUnknown ? `par mois ; ${v.cashUnknown} bien(s) sans loyer, charges ni crédit renseignés` : 'par mois : loyers − charges − crédits, avant impôts'}</span></a>
           </div>
 
           {data.leases.length > 0 && (

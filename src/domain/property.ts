@@ -1,5 +1,5 @@
 import type { AcquisitionSnapshot, Property, Scenario } from '../data/types.ts';
-import { autoProvisionMonthly, autoRecoverableAnnual, normalizeInputs, simulate, summarize, type SimulationInputs, type SimulationResult } from './simulator.ts';
+import { amortize, autoProvisionMonthly, autoRecoverableAnnual, normalizeInputs, round2, simulate, summarize, type SimulationInputs, type SimulationResult } from './simulator.ts';
 import { todayParis } from './format.ts';
 
 export const isOwned = (p: Pick<Property, 'status'>) => p.status === 'acquis';
@@ -54,6 +54,107 @@ export type AnnualChargeField = (typeof ANNUAL_CHARGE_FIELDS)[number][0];
 export function annualChargesTotal(p: Partial<Record<AnnualChargeField, number | null>>): number | null {
   const vals = ANNUAL_CHARGE_FIELDS.map(([k]) => p[k]).filter((v): v is number => v !== null && v !== undefined);
   return vals.length ? Math.round(vals.reduce((a, v) => a + v, 0) * 100) / 100 : null;
+}
+
+/** Crédit d'un bien détenu. */
+export const LOAN_FIELDS = ['loan_amount', 'loan_rate', 'loan_years', 'loan_start_date', 'loan_insurance_monthly', 'loan_monthly_payment'] as const;
+
+export interface LoanInfo {
+  /** Mensualité hors assurance (saisie, sinon calculée). */
+  payment: number;
+  insurance: number;
+  /** Mensualité assurance comprise ; 0 une fois le crédit remboursé. */
+  monthlyTotal: number;
+  computed: boolean;
+  endDate: string | null;
+  /** Capital restant dû à la date donnée (null sans date de début). */
+  remaining: number | null;
+  finished: boolean;
+}
+
+const addMonths = (iso: string, n: number) => {
+  const [y, m, d] = iso.split('-').map(Number) as [number, number, number];
+  const t = new Date(Date.UTC(y, m - 1 + n, 1));
+  const last = new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth() + 1, 0)).getUTCDate();
+  return `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, '0')}-${String(Math.min(d, last)).padStart(2, '0')}`;
+};
+const monthsBetween = (from: string, to: string) => {
+  const [y1, m1, d1] = from.split('-').map(Number) as [number, number, number];
+  const [y2, m2, d2] = to.split('-').map(Number) as [number, number, number];
+  return (y2 - y1) * 12 + (m2 - m1) - (d2 < d1 ? 1 : 0);
+};
+
+type LoanFields = Partial<Record<'loan_amount' | 'loan_rate' | 'loan_years' | 'loan_insurance_monthly' | 'loan_monthly_payment', number | null>> & { loan_start_date?: string | null };
+
+/** Mensualité et capital restant dû. Mensualité constante : capital × t / (1 − (1 + t)^−n). */
+export function loanInfo(p: LoanFields, today: string): LoanInfo | null {
+  const amount = p.loan_amount ?? 0;
+  if (amount <= 0 && !p.loan_monthly_payment) return null;
+  const months = Math.round((p.loan_years ?? 0) * 12);
+  const rows = amount > 0 && months > 0 ? amortize(amount, p.loan_rate ?? 0, months, 0) : [];
+  const computedPayment = rows[0]?.payment ?? 0;
+  const payment = p.loan_monthly_payment ?? computedPayment;
+  const insurance = p.loan_insurance_monthly ?? 0;
+  const endDate = p.loan_start_date && months > 0 ? addMonths(p.loan_start_date, months) : null;
+  let remaining: number | null = null;
+  if (p.loan_start_date && rows.length) {
+    const paid = Math.max(0, monthsBetween(p.loan_start_date, today) + 1);
+    remaining = paid <= 0 ? amount : paid >= rows.length ? 0 : rows[paid - 1]!.balance;
+    if (today < p.loan_start_date) remaining = amount;
+  }
+  const finished = endDate !== null && today >= endDate;
+  return { payment: round2(payment), insurance: round2(insurance), monthlyTotal: finished ? 0 : round2(payment + insurance), computed: p.loan_monthly_payment == null, endDate, remaining, finished };
+}
+
+export interface CashflowEstimate {
+  monthly: number;
+  /** Loyer charges comprises encaissé par mois. */
+  income: number;
+  /** Charges annuelles / 12. */
+  charges: number;
+  /** Mensualité de crédit assurance comprise. */
+  loan: number;
+  source: 'bien' | 'simulation';
+  loanSource: 'bien' | 'simulation' | null;
+}
+
+/**
+ * Cash-flow mensuel prévisionnel d'un bien détenu, avant impôts :
+ * loyer charges comprises (bail en cours, sinon loyer saisi) − charges annuelles / 12 − mensualité de crédit.
+ * Sans loyer ni charge saisis, le résultat de la simulation principale est utilisé.
+ * Sans crédit saisi, la mensualité de la simulation principale est reprise.
+ */
+export function ownedCashflow(
+  p: Property,
+  activeLeases: { rent_hc: number; charges_amount: number }[],
+  sim: SimulationResult | null,
+  today: string,
+): CashflowEstimate | null {
+  const charges = annualChargesTotal(p);
+  const hasOwn = activeLeases.length > 0 || p.estimated_rent != null || p.charges_provision != null || charges != null;
+  const loan = loanInfo(p, today);
+  if (!hasOwn) {
+    if (!sim) return loan ? { monthly: -loan.monthlyTotal, income: 0, charges: 0, loan: loan.monthlyTotal, source: 'bien', loanSource: 'bien' } : null;
+    return { monthly: sim.cashflowMonthlyYear1, income: round2(sim.annualRent / 12), charges: round2(sim.annualOwnerCharges / 12), loan: sim.monthlyPaymentWithInsurance, source: 'simulation', loanSource: sim.loanAmount > 0 ? 'simulation' : null };
+  }
+  const income = activeLeases.length
+    ? activeLeases.reduce((a, l) => a + l.rent_hc + l.charges_amount, 0)
+    : (p.estimated_rent ?? 0) + (p.charges_provision ?? 0);
+  const monthlyCharges = (charges ?? 0) / 12;
+  const loanMonthly = loan ? loan.monthlyTotal : sim && sim.loanAmount > 0 ? sim.monthlyPaymentWithInsurance : 0;
+  const loanSource = loan ? 'bien' : sim && sim.loanAmount > 0 ? 'simulation' : null;
+  return { monthly: round2(income - monthlyCharges - loanMonthly), income: round2(income), charges: round2(monthlyCharges), loan: round2(loanMonthly), source: 'bien', loanSource };
+}
+
+/** Champs d'un bien en prospection alimentés par une simulation (seules les valeurs renseignées). */
+export function prospectFieldsFromSimulation(i: SimulationInputs, r: SimulationResult): Partial<Property> {
+  const out: Partial<Property> = {};
+  if (i.askingPrice > 0) out.asking_price = i.askingPrice;
+  if (i.price > 0) out.offer_price = i.price;
+  if (i.surface > 0) out.surface = i.surface;
+  if (i.works > 0) out.works_budget = i.works;
+  if (r.monthlyRent > 0) out.estimated_rent = r.monthlyRent;
+  return out;
 }
 
 /** Pré-remplit un scénario à partir de la fiche du bien. */

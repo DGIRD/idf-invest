@@ -2,8 +2,8 @@ import { useMemo, useState, type FormEvent } from 'react';
 import { useStore } from '../data/store.tsx';
 import type { Contact, Insert, OccupationStatus, OwnershipMode, Property, PropertyStatus, PropertyType, TaxRegime } from '../data/types.ts';
 import { DPE_VALUES, OCCUPATION_LABELS, OWNERSHIP_LABELS, STATUS_LABELS, STATUS_ORDER, TAX_REGIME_LABELS, TYPE_LABELS } from '../domain/labels.ts';
-import { money2 } from '../domain/format.ts';
-import { ANNUAL_CHARGE_FIELDS, annualChargesTotal, rentWithCharges } from '../domain/property.ts';
+import { money2, todayParis } from '../domain/format.ts';
+import { ANNUAL_CHARGE_FIELDS, annualChargesTotal, LOAN_FIELDS, loanInfo, rentWithCharges } from '../domain/property.ts';
 import { Button, NumberInput, PageHeader, Section, Select, TextArea, TextInput } from '../ui/components.tsx';
 import { navigate } from '../ui/router.ts';
 
@@ -35,10 +35,14 @@ export function PropertyFormPage({ id, mode }: { id?: string; mode: 'prospect' |
   function validate(): boolean {
     const e: Record<string, string> = {};
     if (!draft.title.trim()) e.title = 'Le titre est obligatoire.';
-    for (const k of ['surface', 'asking_price', 'offer_price', 'works_budget', 'estimated_rent', 'charges_provision', 'acquisition_cost', 'rooms', ...ANNUAL_CHARGE_FIELDS.map(([f]) => f)] as const) {
+    for (const k of ['surface', 'asking_price', 'offer_price', 'works_budget', 'estimated_rent', 'charges_provision', 'acquisition_cost', 'rooms', ...ANNUAL_CHARGE_FIELDS.map(([f]) => f), 'loan_amount', 'loan_rate', 'loan_years', 'loan_insurance_monthly', 'loan_monthly_payment'] as const) {
       const v = draft[k];
       if (v !== null && v !== undefined && (!Number.isFinite(v) || v < 0)) e[k] = 'Nombre positif attendu.';
     }
+    if (draft.loan_years === 0) e.loan_years = 'Durée supérieure à zéro.';
+    if ((draft.loan_rate ?? 0) > 30) e.loan_rate = 'Taux annuel en %, 30 au plus.';
+    if ((draft.loan_years ?? 0) > 40) e.loan_years = 'Durée de 40 ans au plus.';
+    if (draft.loan_amount && !draft.loan_years && draft.loan_monthly_payment == null) e.loan_years = 'Indiquez la durée, ou la mensualité si vous la connaissez.';
     if (draft.surface === 0) e.surface = 'La surface doit être supérieure à zéro.';
     if (!owned && draft.listing_url && !/^https?:\/\//i.test(draft.listing_url)) e.listing_url = 'Adresse web commençant par http:// ou https://';
     if (agencyChoice === NEW && !newAgency.trim()) e.agency = 'Nom de l’agence à créer.';
@@ -67,7 +71,7 @@ export function PropertyFormPage({ id, mode }: { id?: string; mode: 'prospect' |
       const payload: Insert<Property> = { ...rest, title: draft.title.trim(), agency_id: agencyId, agent_id: agentId };
       if (!owned) { payload.occupation_status = null; }
       // N'envoyer la provision que si elle est renseignée (compatibilité avec une base pas encore migrée)
-      for (const k of ['charges_provision', ...ANNUAL_CHARGE_FIELDS.map(([f]) => f)] as const) if (payload[k] === null || payload[k] === undefined) delete payload[k];
+      for (const k of ['charges_provision', ...ANNUAL_CHARGE_FIELDS.map(([f]) => f), ...LOAN_FIELDS] as const) if (payload[k] === null || payload[k] === undefined) delete payload[k];
       if (existing) {
         const row = await update('properties', existing, payload, `Le bien « ${existing.title} »`);
         if (row) navigate(`/bien/${row.id}`);
@@ -149,6 +153,8 @@ export function PropertyFormPage({ id, mode }: { id?: string; mode: 'prospect' |
         </Section>
       )}
 
+      {owned && <LoanSection draft={draft} set={set} errors={errors} snapshot={existing?.acquisition_snapshot ?? null} />}
+
       {owned && (
         <Section title="Détention">
           <div className="grid">
@@ -221,4 +227,39 @@ function toLocalInput(iso: string): string {
   const d = new Date(iso);
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function LoanSection({ draft, set, errors, snapshot }: {
+  draft: Draft; set: <K extends keyof Draft>(k: K, v: Draft[K]) => void; errors: Record<string, string>; snapshot: Property['acquisition_snapshot'];
+}) {
+  const info = loanInfo(draft, todayParis());
+  const snap = snapshot?.inputs;
+  const snapLoan = snapshot?.results?.loanAmount ?? 0;
+  const canImport = !draft.loan_amount && snap && snap.useLoan !== false && snapLoan > 0;
+  return (
+    <Section title="Crédit" actions={canImport ? (
+      <Button size="sm" onClick={() => {
+        set('loan_amount', snapLoan);
+        if (snap.interestRate != null) set('loan_rate', snap.interestRate);
+        if (snap.loanYears != null) set('loan_years', snap.loanYears);
+        if (snap.insuranceRate != null) set('loan_insurance_monthly', Math.round(snapLoan * snap.insuranceRate / 12) / 100);
+        if (!draft.loan_start_date && draft.acquired_at) set('loan_start_date', draft.acquired_at);
+      }}>Reprendre le crédit de la simulation</Button>
+    ) : undefined}>
+      <div className="grid">
+        <NumberInput label="Montant emprunté" suffix="€" value={draft.loan_amount ?? null} onChange={(v) => set('loan_amount', v)} error={errors.loan_amount} />
+        <NumberInput label="Taux du crédit" suffix="% / an" value={draft.loan_rate ?? null} onChange={(v) => set('loan_rate', v)} error={errors.loan_rate} hint="Taux nominal, hors assurance" />
+        <NumberInput label="Durée" suffix="ans" value={draft.loan_years ?? null} onChange={(v) => set('loan_years', v)} error={errors.loan_years} />
+        <TextInput label="Première échéance" type="date" value={draft.loan_start_date} onChange={(v) => set('loan_start_date', v || null)} hint="Pour le capital restant dû et la fin du crédit" />
+        <NumberInput label="Assurance emprunteur" suffix="€ / mois" value={draft.loan_insurance_monthly ?? null} onChange={(v) => set('loan_insurance_monthly', v)} error={errors.loan_insurance_monthly} />
+        <NumberInput label="Mensualité hors assurance" suffix="€ / mois" value={draft.loan_monthly_payment ?? null} onChange={(v) => set('loan_monthly_payment', v)} error={errors.loan_monthly_payment}
+          hint={info?.computed && info.payment ? `Calculée : ${money2(info.payment)}. Saisissez celle de votre offre de prêt si elle diffère.` : 'Laissez vide pour la calculer.'} />
+        <div className="field">
+          <span className="label" id="loan-total">Mensualité assurance comprise</span>
+          <output className="computed" aria-labelledby="loan-total">{money2(info ? info.payment + info.insurance : 0)}<small> / mois</small></output>
+          <small className="muted">{info?.remaining != null ? `Capital restant dû : ${money2(info.remaining)}${info.endDate ? `, fin le ${info.endDate.split('-').reverse().join('/')}` : ''}.` : 'Utilisée pour le cash-flow du bien.'}</small>
+        </div>
+      </div>
+    </Section>
+  );
 }

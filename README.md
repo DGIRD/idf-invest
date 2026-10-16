@@ -2,9 +2,9 @@
 
 *Prospectez, investissez et gérez vos locations sereinement.*
 
-Application web progressive (PWA) de prospection immobilière et de gestion locative pour particuliers. Elle succède à **IDF Invest**, dont les données sont reprises.
+Application web progressive (PWA) de prospection immobilière et de gestion locative pour particuliers. Elle succède à l'ancienne version de l'application, dont les données sont reprises.
 
-> **État : lots 1 et 2 livrés** (prospection, Mes biens, simulateur, contacts, reprise IDF Invest ; locataires et baux, loyers et paiements, quittances, relances, dépenses, documents). Les rubriques du lot 3 (synthèse annuelle, abonnement, administration) sont signalées « non disponibles ». Détail exact : [docs/ETAT-DU-PROJET.md](docs/ETAT-DU-PROJET.md).
+> **État : lots 1 et 2 livrés** (prospection, Mes biens, simulateur, contacts, reprise de l'ancienne version ; locataires et baux, loyers et paiements, quittances, relances, dépenses, documents). Les rubriques du lot 3 (synthèse annuelle, abonnement, administration) sont signalées « non disponibles ». Détail exact : [docs/ETAT-DU-PROJET.md](docs/ETAT-DU-PROJET.md).
 
 ## Démarrer en local
 
@@ -30,7 +30,7 @@ npm run build && npm run test:e2e   # parcours navigateur bureau et mobile, capt
 |---|---|
 | [ETAT-DU-PROJET](docs/ETAT-DU-PROJET.md) | Implémenté, testé, à configurer, restant ; limites connues |
 | [ARCHITECTURE](docs/ARCHITECTURE.md) | Choix techniques, structure du code, environnements |
-| [MIGRATION-IDF-INVEST](docs/MIGRATION-IDF-INVEST.md) | Analyse de l'existant, correspondances, sauvegarde, annulation |
+| [MIGRATION-ANCIENNE-VERSION](docs/MIGRATION-ANCIENNE-VERSION.md) | Analyse de l'existant, correspondances, sauvegarde, annulation |
 | [FORMULES-SIMULATEUR](docs/FORMULES-SIMULATEUR.md) | Formules, conventions, arrondis |
 | [SECURITE](docs/SECURITE.md) | Isolation des données, RLS, secrets, synchronisation |
 | [DEPLOIEMENT](docs/DEPLOIEMENT.md) | Mise en service pas à pas, sauvegarde et restauration |

@@ -174,7 +174,7 @@ test('charges de copropriété : 80 % récupérables, arrondis à l’euro supé
   assert.equal(autoProvisionMonthly(0), 0);
 });
 
-test('anciens scénarios : loyer saisi conservé, fourchette IDF Invest reprise', () => {
+test('anciens scénarios : loyer saisi conservé, fourchette de l’ancienne version reprise', () => {
   const i = normalizeInputs({ monthlyRent: 850, legacy: { rentM2Low: 20, rentM2High: 24 } } as never);
   assert.equal(i.rentMode, 'manuel');
   assert.equal(i.monthlyRent, 850);

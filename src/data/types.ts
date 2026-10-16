@@ -47,6 +47,13 @@ export interface Property extends Versioned {
   management_annual?: number | null;
   gli_annual?: number | null;
   other_charges_annual?: number | null;
+  /** Crédit d'un bien détenu. */
+  loan_amount?: number | null;
+  loan_rate?: number | null;
+  loan_years?: number | null;
+  loan_start_date?: string | null;
+  loan_insurance_monthly?: number | null;
+  loan_monthly_payment?: number | null;
   agency_id: string | null;
   agent_id: string | null;
   next_action: string | null;

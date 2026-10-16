@@ -28,7 +28,7 @@ supabase/
   rollback/    scripts d'annulation
   tests/       tests SQL sur PostgreSQL local (émulation de auth.uid)
 tests/         tests unitaires (node:test) et parcours navigateur (Playwright)
-legacy/        ancienne application IDF Invest, pour référence (non publiée)
+legacy/        ancienne version de l'application, pour référence (non publiée)
 ```
 
 ## Une table, deux vues

@@ -1,13 +1,13 @@
 # Tests et résultats
 
-Exécution du 14/10/2026 sur la branche `lot-2`.
+Exécution du 16/10/2026.
 
 | Suite | Commande | Résultat |
 |---|---|---|
 | Typage strict (`strict`, `noUncheckedIndexedAccess`) | `npm run typecheck` | 0 erreur |
-| Unitaires : simulateur (15), règles des biens, reprise, sauvegarde/import, CSV, XLSX (8), gestion locative et quittance PDF (11), file d'e-mails (7) | `npm test` | **41/41** |
+| Unitaires : simulateur (21), règles des biens, crédit et cash-flow des biens détenus, lien simulateur → prospection, reprise, sauvegarde/import, CSV, XLSX, gestion locative et quittance PDF, file d'e-mails | `npm test` | **49/49** |
 | SQL lot 1 : reprise (16), isolation (13), règles et concurrence (16), compte (2), annulation (5) ; lot 2 : baux, échéances, paiements, quittances, relances, documents, dépenses, isolation, tâches quotidiennes, file d'e-mails (61) | `npm run test:db` | **113/113** |
-| Navigateur (Chromium, bureau 1360 px et mobile 390 px, mode démonstration) | `npm run build && npm run test:e2e` | **29/29 étapes** |
+| Navigateur (Chromium, bureau 1360 px et mobile 390 px, mode démonstration) | `npm run build && npm run test:e2e` | **30/30 étapes** |
 
 ## Couverture des exigences minimales
 

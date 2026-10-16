@@ -1,4 +1,4 @@
-# État du projet — lots 1 et 2 (14 octobre 2026)
+# État du projet — lots 1 et 2 (16 octobre 2026)
 
 Légende : **Implémenté et testé** = code livré et couvert par un test automatisé exécuté · **Implémenté** = code livré, vérifié à la main seulement · **À configurer** = code livré, nécessite un service externe · **Restant** = non commencé.
 
@@ -6,13 +6,13 @@ Légende : **Implémenté et testé** = code livré et couvert par un test autom
 
 | Fonction | État | Preuve |
 |---|---|---|
-| Analyse d'IDF Invest et reprise des données (simulations → biens + scénarios + contacts agence/agent dédoublonnés) | Implémenté et testé | `supabase/tests` (16 vérifications), e2e |
+| Analyse de l'ancienne version et reprise des données (simulations → biens + scénarios + contacts agence/agent dédoublonnés) | Implémenté et testé | `supabase/tests` (16 vérifications), e2e |
 | Sauvegarde préalable et annulation de la reprise | Implémenté et testé | test de réversibilité SQL |
-| Reprise des simulations IDF Invest restées dans le navigateur (hors connexion) | Implémenté et testé | e2e |
+| Reprise des simulations de l'ancienne version restées dans le navigateur (hors connexion) | Implémenté et testé | e2e |
 | Schéma PostgreSQL, verrou optimiste, RLS par utilisateur | Implémenté et testé | tests SQL deux comptes |
 | Connexion, création de compte, mot de passe oublié (Supabase Auth) | À configurer | testé en mode démonstration uniquement ; nécessite le projet Supabase |
 | Menu complet ; rubriques des lots 2-3 marquées « non disponibles » | Implémenté et testé | e2e |
-| États des lieux : supprimés (menu, écrans, routes, code) | Implémenté et testé | e2e vérifie le code livré ; IDF Invest n'en contenait pas |
+| États des lieux : supprimés (menu, écrans, routes, code) | Implémenté et testé | e2e vérifie le code livré ; l'ancienne version n'en contenait pas |
 | Prospection : tableau (recherche, tri, filtres, pagination, sélection multiple, colonnes personnalisables, actions, cartes mobiles) | Implémenté et testé | e2e |
 | 15 statuts d'acquisition, statuts d'occupation distincts | Implémenté et testé | SQL + unitaires |
 | Passage à « Acquis » → Mes biens, même ligne, historique conservé, photographie des hypothèses | Implémenté et testé | SQL + e2e |
@@ -54,6 +54,10 @@ Légende : **Implémenté et testé** = code livré et couvert par un test autom
 | Documents privés : bucket privé, chemins par compte, types et taille contrôlés, lien temporaire 60 s, suppression des fichiers | Implémenté et testé (règles SQL, interface en démonstration) / **non testé** contre le vrai stockage Supabase | SQL + e2e |
 | Mes biens : locataire actif, « Loué » déduit des baux, encaissements, dépenses, solde, cash-flow réel de l'année | Implémenté et testé | e2e |
 | Tableau de bord : impayés, quittances à émettre, relances à valider | Implémenté | captures |
+| Simulateur → prospection : une simulation sans bien crée un bien « Repéré » ; le scénario principal met à jour prix, surface, travaux et loyer du bien en prospection | Implémenté et testé | unitaires + e2e |
+| Mes biens : crédit (montant, taux, durée, première échéance, assurance, mensualité saisie ou calculée), capital restant dû | Implémenté et testé | unitaires + e2e |
+| Cash-flow prévisionnel par bien détenu et au tableau de bord : loyer CC (bail en cours sinon loyer saisi) − charges annuelles / 12 − crédit ; à défaut de données, simulation principale | Implémenté et testé | unitaires + e2e |
+| Adresse de l'application : https://dgird.github.io/immo-zen/ ; icônes Immo-Zen | Implémenté | — |
 | Exports .xlsx / CSV des échéances, paiements, dépenses ; sauvegarde JSON incluant la gestion locative | Implémenté | — |
 
 ## Restant
@@ -63,7 +67,9 @@ Légende : **Implémenté et testé** = code livré et couvert par un test autom
 ## Limites connues
 
 ### Lot 2
-- Migrations complémentaires du 14/10 à exécuter si ce n'est pas fait : `20261014000100_property_charges_provision.sql` (provision sur charges) et `20261014000300_property_annual_charges.sql` (charges annuelles de Mes biens). Sans elles, un bien dont ces champs sont renseignés ne peut pas être enregistré.
+- **Migration du 16/10 à exécuter** : `20261016000100_property_loan.sql` (crédit des biens détenus ; reprend aussi, sans effet s'ils existent, les champs du 14/10, et retire le nom de l'ancienne version des libellés repris). Sans elle, un bien détenu avec un crédit ne peut pas être enregistré.
+- Le cash-flow prévisionnel ne compte ni la vacance locative ni l'entretien d'un bien détenu, faute de champ dédié (les dépenses réelles sont dans le cash-flow réel).
+- Migrations complémentaires du 14/10 (reprises par celle du 16/10) : `20261014000100_property_charges_provision.sql` (provision sur charges) et `20261014000300_property_annual_charges.sql` (charges annuelles de Mes biens). Sans elles, un bien dont ces champs sont renseignés ne peut pas être enregistré.
 - **Migration SQL à exécuter** : `supabase/migrations/20261014000200_lot2_gestion_locative.sql`. Tant qu'elle ne l'est pas, l'application fonctionne pour le lot 1 et affiche un bandeau « Mise à jour de la base requise ».
 - **E-mails non envoyés** tant que la fonction `daily`, la planification et un fournisseur (Resend) ne sont pas configurés ([TACHES-SERVEUR](TACHES-SERVEUR.md)). Les messages restent en file, visibles comme « envoi en attente ».
 - Ni la fonction serveur ni le stockage Supabase n'ont pu être exécutés pendant le développement : leur logique est testée, pas leur déploiement.
@@ -77,8 +83,6 @@ Légende : **Implémenté et testé** = code livré et couvert par un test autom
 - **Création de compte ouverte** tant que l'abonnement (lot 3) n'existe pas : n'importe qui peut créer un compte et utiliser l'application gratuitement.
 - **Pas de projet Supabase ni de navigateur connecté au réseau** pendant ce lot : l'authentification réelle, les appels PostgREST et la reprise sur la base de production n'ont pas été exécutés. Les migrations sont testées sur PostgreSQL 16 avec une émulation minimale de Supabase (`auth.uid()`, rôles). Une recette sur un projet Supabase de test est indispensable avant la production (voir DEPLOIEMENT).
 - La CI installe les vraies dépendances npm ; en local, ce lot a été vérifié avec des versions déjà présentes (React 19.2, TypeScript 6.0, supabase-js 2.117 compilé depuis ses sources). Aucun fichier de verrouillage `package-lock.json` n'a pu être généré : à commiter après le premier `npm install`.
-- Les icônes sont encore celles d'IDF Invest.
 - Copie locale des données (lecture hors connexion) stockée en clair dans le navigateur, effacée à la déconnexion. À éviter sur un appareil partagé sans déconnexion.
 - Taille du script : ~1,2 Mo minifié depuis le lot 2 (génération PDF intégrée), ≈ 350 Ko compressé. Un chargement différé du module PDF est prévu.
-- Le cash-flow « réel » de Mes biens attend les paiements et dépenses (lot 2) ; seul le cash-flow simulé est affiché, et étiqueté comme tel.
-- Les résultats des simulations reprises peuvent différer d'IDF Invest, dont le « mode simplifié » mélangeait loyer charges comprises et charges partielles. Les anciennes valeurs sont conservées dans `inputs.legacy.results`.
+- Les résultats des simulations reprises peuvent différer de l'ancienne version, dont le « mode simplifié » mélangeait loyer charges comprises et charges partielles. Les anciennes valeurs sont conservées dans `inputs.legacy.results`.

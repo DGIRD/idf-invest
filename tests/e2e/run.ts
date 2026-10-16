@@ -156,6 +156,16 @@ async function main() {
     assert.equal(await val('dont récupérables', '960'), '960', 'part récupérable recalculée');
     assert.equal(await val('Provision sur charges', '50'), '50', 'valeur modifiée à la main conservée');
     await page.screenshot({ path: join(out, '19-simulateur-loyer-m2.png'), fullPage: true });
+    // le simulateur alimente la prospection
+    await page.getByRole('button', { name: 'Enregistrer', exact: true }).click();
+    await page.getByText('Donnez un titre au bien').waitFor();
+    await page.getByLabel('Titre du nouveau bien').fill('Studio simulé');
+    await page.getByRole('button', { name: 'Enregistrer', exact: true }).click();
+    await page.getByText('ajouté à la prospection').first().waitFor();
+    await page.goto(url + '#/prospection');
+    const row = page.locator('tbody tr', { hasText: 'Studio simulé' });
+    await row.waitFor();
+    assert.match((await row.innerText()).replace(/[\u202f\u00a0]/g, ' '), /250 000 €/, 'prix de présentation repris dans la prospection');
   });
 
   await step('tableau prospection : rendement, cash-flow, relance', async () => {
@@ -252,14 +262,27 @@ async function main() {
     await page.getByLabel('Charges de copropriété').fill('1200');
     await page.getByLabel('Assurance PNO').fill('99');
     assert.match((await page.locator('output[aria-labelledby="charges-total"]').innerText()).replace(/[\u202f\u00a0]/g, ' '), /2 199,00 €/, 'total des charges annuelles');
+    await page.getByLabel('Montant emprunté').fill('100000');
+    await page.getByLabel('Durée').fill('15');
+    await page.getByLabel('Assurance emprunteur').fill('20');
+    await page.getByLabel('Mensualité hors assurance').fill('500');
+    assert.match((await page.locator('output[aria-labelledby="loan-total"]').innerText()).replace(/[\u202f\u00a0]/g, ' '), /520,00 €/, 'mensualité assurance comprise');
     await page.getByLabel('Mode de détention').selectOption('nom_propre');
     await page.getByRole('button', { name: 'Enregistrer' }).first().click();
     await page.getByRole('heading', { name: 'Parking détenu' }).waitFor();
     await page.getByText('Loyer charges comprises').waitFor();
     assert.match((await page.locator('.kv').innerText()).replace(/[\u202f\u00a0]/g, ' '), /825,50 € \/ mois/);
+    // cash-flow = 825,50 − 2 199 / 12 − 520 = 122,25 €
+    assert.match((await page.locator('.figures').first().innerText()).replace(/[\u202f\u00a0]/g, ' '), /122 €/, 'cash-flow du bien avec crédit');
     await page.goto(url + '#/biens');
     await page.getByRole('button', { name: 'Parking détenu' }).waitFor();
+    assert.match((await page.locator('tbody tr', { hasText: 'Parking détenu' }).innerText()).replace(/[\u202f\u00a0]/g, ' '), /122 €/);
     await page.screenshot({ path: join(out, '06-mes-biens.png') });
+    await page.goto(url + '#/');
+    const fig = (await page.locator('.figure', { hasText: 'Cash-flow prévisionnel' }).innerText()).replace(/[\u202f\u00a0]/g, ' ');
+    assert.match(fig, /-?\d[\d ]* €/, `cash-flow du tableau de bord calculé : ${fig}`);
+    assert.doesNotMatch(fig, /sans loyer/, 'tous les biens détenus ont un cash-flow');
+    await page.screenshot({ path: join(out, '20-tableau-de-bord.png') });
   });
 
   await step('conflit : une modification concurrente n’écrase rien en silence', async () => {
@@ -301,19 +324,19 @@ async function main() {
     await page.getByRole('button', { name: 'Annuler' }).click();
   });
 
-  await step('reprise des simulations IDF Invest restées dans le navigateur', async () => {
+  await step('reprise des simulations de l’ancienne version restées dans le navigateur', async () => {
     await page.evaluate(() => localStorage.setItem('idf-invest-v6:abc', JSON.stringify({ simulations: [{ id: '9b2c1f00-0000-4000-8000-000000000001', number: 'SIM-2026-0007', title: 'Ancienne simulation', status: 'Offre en cours', surface: 30, offerPrice: 140000, loanYears: 20, rentLevel: 'Personnalisé', customRent: 700, agency: 'agence test', archived: false }] })));
     await page.reload();
-    await page.getByText('1 simulation(s) IDF Invest').waitFor();
+    await page.getByText('1 simulation(s) de l’ancienne version').waitFor();
     page.once('download', () => undefined);
     await page.getByRole('button', { name: 'Reprendre ces simulations' }).click();
     await page.getByRole('button', { name: 'Reprendre', exact: true }).click();
-    await page.getByText('1 simulation(s) IDF Invest reprise(s).').waitFor();
+    await page.getByText('1 simulation(s) de l’ancienne version reprise(s).').waitFor();
     const db = await page.evaluate(() => JSON.parse(localStorage.getItem('immozen:demo:v1')!));
     const p = db.properties.find((x: { title: string }) => x.title === 'Ancienne simulation');
     assert.equal(p.status, 'offre_transmise');
     assert.equal(db.pro_contacts.filter((c: { kind: string }) => c.kind === 'agence').length, 1, 'agence dédoublonnée');
-    await page.getByText('Aucune simulation IDF Invest en attente').waitFor();
+    await page.getByText('Aucune simulation de l’ancienne version en attente').waitFor();
   });
 
   let leaseUrl = '';
