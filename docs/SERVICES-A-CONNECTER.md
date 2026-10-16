@@ -2,7 +2,7 @@
 
 | Service | Usage | Lot | État | Action |
 |---|---|---|---|---|
-| Supabase (projet existant d'IDF Invest) | base, comptes, RLS | 1 | **À configurer** | exécuter les migrations, régler Auth (DEPLOIEMENT) |
+| Supabase (projet existant) | base, comptes, RLS | 1 | **À configurer** | exécuter les migrations, régler Auth (DEPLOIEMENT) |
 | Supabase (projet de test) | recette | 1 | **À créer** | — |
 | GitHub Pages (Actions) | hébergement | 1 | **À configurer** | source « GitHub Actions » + variables |
 | Supabase Storage | documents et photos privés | 2 | **Créé par la migration** | bucket « documents » privé et politiques inclus dans la migration du lot 2 |

@@ -177,7 +177,7 @@ begin
     returning id into v_property;
 
     insert into public.scenarios (user_id, property_id, name, inputs, results, engine_version, legacy_simulation_id, created_at)
-    values (s.user_id, v_property, 'Simulation IDF Invest ' || coalesce(s.number, ''),
+    values (s.user_id, v_property, 'Simulation reprise ' || coalesce(s.number, ''),
       jsonb_build_object(
         'priceMode', 'hors_honoraires',
         'price', coalesce(num(d->'offerPrice'), 0),
@@ -223,7 +223,7 @@ begin
     update public.properties set primary_scenario_id = v_scenario where id = v_property;
 
     insert into public.timeline_events (user_id, property_id, kind, summary, data)
-    values (s.user_id, v_property, 'migration', 'Repris depuis IDF Invest (' || coalesce(s.number, s.id::text) || ')',
+    values (s.user_id, v_property, 'migration', 'Repris de l''ancienne version (' || coalesce(s.number, s.id::text) || ')',
             jsonb_build_object('legacy_simulation_id', s.id, 'legacy_status', txt(d->'status'), 'archived', s.archived));
 
     v_props := v_props + 1;
@@ -236,7 +236,7 @@ begin
            left(coalesce(txt(c.data->'name'), txt(c.data->'nom'), txt(c.data->'agentName'), txt(c.data->'email'), 'Contact importé'), 200),
            case when lower(txt(c.data->'email')) ~* '^[^@\s]+@[^@\s]+\.[^@\s]+$' then lower(txt(c.data->'email')) end,
            left(coalesce(txt(c.data->'phone'), txt(c.data->'telephone')), 40),
-           'Import IDF Invest : ' || left(c.data::text, 15000),
+           'Import de l''ancienne version : ' || left(c.data::text, 15000),
            'idf-invest-contacts:' || c.id::text, c.created_at
       from public.contacts c
      where exists (select 1 from auth.users u where u.id = c.user_id)

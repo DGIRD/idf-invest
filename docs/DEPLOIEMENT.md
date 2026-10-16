@@ -1,6 +1,6 @@
 # Mise en service
 
-L'application IDF Invest en ligne reste intacte tant que la branche `immo-zen` n'est pas fusionnée dans `main`.
+L'ancienne version en ligne reste intacte tant que la branche `immo-zen` n'est pas fusionnée dans `main`.
 
 ## 1. Recette sur un projet Supabase de test
 
@@ -17,20 +17,24 @@ Avant toute migration : Database → Backups (ou `pg_dump` depuis la chaîne de 
 
 ## 3. Migration de la production
 
-Même ordre qu'en test. Vérifiez le contrôle de comptage indiqué dans [MIGRATION-IDF-INVEST](MIGRATION-IDF-INVEST.md). L'ancienne application continue de fonctionner.
+Même ordre qu'en test. Vérifiez le contrôle de comptage indiqué dans [MIGRATION-ANCIENNE-VERSION](MIGRATION-ANCIENNE-VERSION.md). L'ancienne application continue de fonctionner.
 
 ## 4. Publication
 
 1. GitHub → Settings → Pages → Source : **GitHub Actions** (aujourd'hui la publication se fait directement depuis la branche).
-2. Projet Supabase : l'URL et la clé publique de production sont déjà dans `.github/workflows/deploy.yml` (reprises d'IDF Invest). Pour viser un autre projet, définissez les variables `IMMOZEN_SUPABASE_URL` et `IMMOZEN_SUPABASE_ANON_KEY` (Settings → Secrets and variables → Actions → Variables).
+2. Projet Supabase : l'URL et la clé publique de production sont déjà dans `.github/workflows/deploy.yml` (reprises de l'ancienne version). Pour viser un autre projet, définissez les variables `IMMOZEN_SUPABASE_URL` et `IMMOZEN_SUPABASE_ANON_KEY` (Settings → Secrets and variables → Actions → Variables).
 3. Fusionnez la pull request. Le workflow « Déploiement » vérifie, construit et publie. Il refuse de publier sans projet Supabase configuré.
-4. Les utilisateurs ayant installé IDF Invest reçoivent la nouvelle version au prochain chargement (nouveau service worker). En cas d'affichage de l'ancienne version : recharger, ou réinstaller la PWA.
+4. Les utilisateurs ayant installé l'ancienne version reçoivent la nouvelle version au prochain chargement (nouveau service worker). En cas d'affichage de l'ancienne version : recharger, ou réinstaller la PWA.
 5. Relancez `select * from immozen_backup.migrate_idf_invest();` pour reprendre les simulations créées entre la migration et la bascule.
+
+## Adresse de l'application
+
+Depuis le 16/10/2026, le dépôt s'appelle `DGIRD/immo-zen` et l'application est publiée sur **https://dgird.github.io/immo-zen/** (l'ancienne adresse `…/idf-invest/` ne répond plus). Dans Supabase → Authentication → URL Configuration : *Site URL* = `https://dgird.github.io/immo-zen/`, et ajouter la même adresse (ou `https://dgird.github.io/immo-zen/**`) dans *Redirect URLs*, sans quoi les liens de réinitialisation du mot de passe renverraient vers l'ancienne adresse. Une application installée depuis l'ancienne adresse doit être réinstallée depuis la nouvelle.
 
 ## Retour arrière
 
-- Application : republier l'ancienne version (revert du commit de fusion) ; IDF Invest refonctionne immédiatement, ses tables n'ayant pas été modifiées.
-- Données : scripts de `supabase/rollback/` (voir MIGRATION-IDF-INVEST).
+- Application : republier l'ancienne version (revert du commit de fusion) ; l'ancienne version refonctionne immédiatement, ses tables n'ayant pas été modifiées.
+- Données : scripts de `supabase/rollback/` (voir MIGRATION-ANCIENNE-VERSION).
 
 ## Restauration
 
@@ -44,4 +48,4 @@ Même ordre qu'en test. Vérifiez le contrôle de comptage indiqué dans [MIGRAT
 |---|---|---|
 | Développement | local ou projet dev | `.env` |
 | Test | immo-zen-test | `.env` ou variables d'un environnement GitHub « test » |
-| Production | projet actuel d'IDF Invest | variables du dépôt |
+| Production | projet Supabase actuel | variables du dépôt |

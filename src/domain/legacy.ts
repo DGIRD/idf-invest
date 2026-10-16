@@ -1,5 +1,5 @@
 /**
- * Reprise des simulations IDF Invest restées uniquement dans le navigateur
+ * Reprise des simulations de l'ancienne version restées uniquement dans le navigateur
  * (clé localStorage « idf-invest-v6:<id utilisateur> » de l'ancienne application).
  * Même logique que la fonction SQL immozen_backup.migrate_idf_invest().
  */

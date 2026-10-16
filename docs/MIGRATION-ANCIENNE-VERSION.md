@@ -1,4 +1,4 @@
-# Reprise des données IDF Invest
+# Reprise des données de l'ancienne version
 
 ## Ce qui existait (commit `aaf144f`, 10/10/2026)
 
@@ -10,14 +10,14 @@
 
 ## Principes
 
-1. **Additive** : aucune table IDF Invest n'est modifiée ni supprimée ; l'ancienne application fonctionne jusqu'à la bascule.
+1. **Additive** : aucune table de l'ancienne version n'est modifiée ni supprimée ; l'ancienne application fonctionne jusqu'à la bascule.
 2. **Sauvegardée** : copie intégrale dans `immozen_backup.idf_simulations_20261013` et `immozen_backup.idf_contacts_20261013` (schéma non exposé à l'API).
 3. **Idempotente** : `immozen_backup.migrate_idf_invest()` ne reprend que les simulations absentes (clé `properties.legacy_simulation_id`, unique).
 4. **Réversible** : `supabase/rollback/20261013000200_migrate_idf_invest.down.sql` supprime exactement ce qui a été créé, puis `…core.down.sql` retire le schéma.
 
 ## Correspondances
 
-| IDF Invest (`data`) | Immo-Zen |
+| Ancienne version (`data`) | Immo-Zen |
 |---|---|
 | title, address, zip, city, surface, rooms, dpe, listingUrl, comments | `properties` (valeurs invalides écartées : DPE hors A-G, lien non http(s)) |
 | propertyType | `property_type` (Appartement → appartement…) |
@@ -33,7 +33,7 @@
 | number, rentM2Low/High, rentLevel, customRent, simplifiedMode, résultats calculés | conservés dans `scenarios.inputs.legacy` |
 | `public.contacts.data` | contact « autre », données brutes copiées dans les notes |
 
-Un événement « Reprise IDF Invest » est ajouté à l'historique de chaque bien.
+Un événement « Reprise de l'ancienne version » est ajouté à l'historique de chaque bien.
 
 ## Exécution
 

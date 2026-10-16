@@ -154,7 +154,7 @@ export function normalizeInputs(partial: Partial<Record<keyof SimulationInputs, 
   if (p.rentMode === 'bas' || p.rentMode === 'haut' || p.rentMode === 'manuel') out.rentMode = p.rentMode;
   // Scénario enregistré avant l'ajout du loyer au m² : le loyer saisi est conservé tel quel.
   else if (p.monthlyRent !== undefined) out.rentMode = 'manuel';
-  // Fourchette de loyer au m² héritée d'IDF Invest
+  // Fourchette de loyer au m² héritée de l'ancienne version
   const legacy = (p as { legacy?: { rentM2Low?: unknown; rentM2High?: unknown } }).legacy;
   if (legacy && p.rentM2Low === undefined && typeof legacy.rentM2Low === 'number') out.rentM2Low = legacy.rentM2Low;
   if (legacy && p.rentM2High === undefined && typeof legacy.rentM2High === 'number') out.rentM2High = legacy.rentM2High;

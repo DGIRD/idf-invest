@@ -38,7 +38,7 @@ export function ProspectionPage() {
   return (
     <>
       <PageHeader title="Prospection" subtitle="Les biens que vous étudiez et qui ne sont pas encore acquis."
-        actions={<Button variant="primary" onClick={() => navigate('/bien/nouveau?mode=prospect')}>Ajouter un bien</Button>} />
+        actions={<><Button onClick={() => navigate('/simulateur')}>Nouvelle simulation</Button><Button variant="primary" onClick={() => navigate('/bien/nouveau?mode=prospect')}>Ajouter un bien</Button></>} />
       <DataTable
         id="prospection"
         rows={rows}

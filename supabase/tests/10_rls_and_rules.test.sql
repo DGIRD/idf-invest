@@ -51,7 +51,7 @@ select tests.ok((select count(*) from public.timeline_events where kind = 'migra
 select tests.ok((select migrated_properties = 0 from immozen_backup.migrate_idf_invest()), 'reprise : seconde exécution sans doublon');
 select tests.ok((select count(*) from public.properties) = 3, 'reprise : toujours 3 biens après relance');
 select tests.ok((select count(*) from immozen_backup.idf_simulations_20261013) = 3, 'sauvegarde : copie intégrale des simulations');
-select tests.ok((select count(*) from public.simulations) = 3, 'tables IDF Invest intactes');
+select tests.ok((select count(*) from public.simulations) = 3, 'tables de l''ancienne version intactes');
 
 -- ===================== Isolation entre comptes =====================
 begin;

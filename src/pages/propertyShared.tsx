@@ -4,7 +4,7 @@ import type { Contact, Insert, Property, Scenario } from '../data/types.ts';
 import { downloadBlob, stamp, toCsv, toXlsx, type ExportColumn } from '../domain/exporting.ts';
 import { date, money, number, pct, todayParis } from '../domain/format.ts';
 import { OCCUPATION_LABELS, OWNERSHIP_LABELS, STATUS_LABELS, TYPE_LABELS } from '../domain/labels.ts';
-import { ANNUAL_CHARGE_FIELDS, annualChargesTotal, metrics, rentWithCharges, summarize, type PropertyMetrics } from '../domain/property.ts';
+import { ANNUAL_CHARGE_FIELDS, annualChargesTotal, isOwned, loanInfo, metrics, ownedCashflow, rentWithCharges, summarize, type CashflowEstimate, type PropertyMetrics } from '../domain/property.ts';
 import { propertyRentalSummary, type PropertyRentalSummary } from '../domain/rental.ts';
 
 import { normalizeInputs, simulate } from '../domain/simulator.ts';
@@ -18,6 +18,8 @@ export interface PropertyRow {
   agent: Contact | null;
   /** Suivi locatif de l'année en cours (biens détenus). */
   rs: PropertyRentalSummary;
+  /** Cash-flow prévisionnel d'un bien détenu (loyer − charges − crédit). */
+  cf: CashflowEstimate | null;
 }
 
 export function usePropertyRows(filter: (p: Property) => boolean): PropertyRow[] {
@@ -27,18 +29,27 @@ export function usePropertyRows(filter: (p: Property) => boolean): PropertyRow[]
     const today = todayParis();
     const year = Number(today.slice(0, 4));
     const rental = { leases: data.leases, leaseTenants: data.leaseTenants, tenants: data.tenants, charges: data.charges, payments: data.payments, allocations: data.allocations, expenses: data.expenses };
-    return data.properties.filter(filter).map((p) => ({
-      rs: propertyRentalSummary(p.id, year, today, rental),
-      p,
-      m: metrics(p, data.scenarios, simulatorDefaults),
-      agency: p.agency_id ? contacts.get(p.agency_id) ?? null : null,
-      agent: p.agent_id ? contacts.get(p.agent_id) ?? null : null,
-    }));
+    return data.properties.filter(filter).map((p) => {
+      const rs = propertyRentalSummary(p.id, year, today, rental);
+      const m = metrics(p, data.scenarios, simulatorDefaults);
+      return {
+        rs, p, m,
+        cf: isOwned(p) ? ownedCashflow(p, rs.activeLeases, m.result, today) : null,
+        agency: p.agency_id ? contacts.get(p.agency_id) ?? null : null,
+        agent: p.agent_id ? contacts.get(p.agent_id) ?? null : null,
+      };
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, simulatorDefaults]);
 }
 
 const rentCC = (r: PropertyRow) => { const l = r.rs.activeLeases[0]; return l ? Math.round((l.rent_hc + l.charges_amount) * 100) / 100 : rentWithCharges(r.p); };
+
+export function cfTitle(cf: CashflowEstimate | null): string {
+  if (!cf) return 'Renseignez le loyer, les charges ou le crédit du bien';
+  if (cf.source === 'simulation') return 'D’après la simulation principale (aucun loyer ni charge saisi sur le bien)';
+  return `Loyer CC ${money(cf.income)} − charges ${money(cf.charges)} − crédit ${money(cf.loan)}${cf.loanSource === 'simulation' ? ' (simulation)' : ''}, par mois, avant impôts`;
+}
 
 const tone = (x: number | null | undefined) => (x === null || x === undefined ? '' : x >= 0 ? 'pos' : 'neg');
 
@@ -105,8 +116,12 @@ export function ownedColumns(): Column<PropertyRow>[] {
       render: (r) => <span className={r.rs.overdue ? 'neg' : ''} title={r.rs.overdue ? `Impayé échu : ${money(r.rs.overdue)}` : r.rs.balance > 0 ? 'Avance des locataires' : undefined}>{money(r.rs.balance)}</span> },
     { id: 'realcf', label: `Cash-flow réel ${y}`, value: (r) => r.rs.cashflow, kind: 'money', align: 'right',
       render: (r) => <span className={tone(r.rs.cashflow)} title="Loyers encaissés − dépenses payées depuis le 1er janvier (hors dépôt de garantie, avant impôts)">{money(r.rs.cashflow)}</span>, mobile: true },
-    { id: 'cashflow', label: 'Cash-flow prévu / mois', value: (r) => r.m.result?.cashflowMonthlyYear1 ?? null, kind: 'money', align: 'right', defaultHidden: true,
-      render: (r) => <span className={tone(r.m.result?.cashflowMonthlyYear1)} title="Cash-flow prévisionnel de la simulation">{money(r.m.result?.cashflowMonthlyYear1)}</span> },
+    { id: 'cashflow', label: 'Cash-flow / mois', value: (r) => r.cf?.monthly ?? null, kind: 'money', align: 'right', mobile: true,
+      render: (r) => <span className={tone(r.cf?.monthly)} title={cfTitle(r.cf)}>{money(r.cf?.monthly)}</span> },
+    { id: 'loan', label: 'Mensualité crédit', value: (r) => loanInfo(r.p, todayParis())?.monthlyTotal ?? null, kind: 'money', align: 'right',
+      render: (r) => money(loanInfo(r.p, todayParis())?.monthlyTotal ?? null) },
+    { id: 'crd', label: 'Capital restant dû', value: (r) => loanInfo(r.p, todayParis())?.remaining ?? null, kind: 'money', align: 'right', defaultHidden: true,
+      render: (r) => money(loanInfo(r.p, todayParis())?.remaining ?? null) },
   ];
 }
 

@@ -1,7 +1,7 @@
 # Publication sur GitHub Pages à chaque fusion dans main.
 # Prérequis (voir docs/DEPLOIEMENT.md) :
 #   - Settings > Pages > Source : « GitHub Actions »
-#   - Projet Supabase : valeurs publiques ci-dessous (reprises de l'ancien config.js d'IDF Invest).
+#   - Projet Supabase : valeurs publiques ci-dessous (reprises de l'ancien config.js).
 #     Des variables du dépôt IMMOZEN_SUPABASE_URL / IMMOZEN_SUPABASE_ANON_KEY les remplacent si elles existent.
 #   - Migrations SQL appliquées sur le projet Supabase AVANT la fusion
 name: Déploiement

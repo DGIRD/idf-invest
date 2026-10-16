@@ -3,7 +3,8 @@ import { useStore } from '../data/store.tsx';
 import type { Channel, Insert, PropertyStatus, PropertyTask, Scenario, TimelineEvent } from '../data/types.ts';
 import { date, dateTime, money, money2, number, pct, todayParis } from '../domain/format.ts';
 import { CHANNEL_LABELS, EVENT_LABELS, OCCUPATION_LABELS, OWNERSHIP_LABELS, STATUS_LABELS, STATUS_ORDER, TAX_REGIME_LABELS, TYPE_LABELS } from '../domain/labels.ts';
-import { ANNUAL_CHARGE_FIELDS, annualChargesTotal, isOwned, metrics, rentWithCharges, scenarioResult } from '../domain/property.ts';
+import { ANNUAL_CHARGE_FIELDS, annualChargesTotal, isOwned, loanInfo, metrics, ownedCashflow, rentWithCharges, scenarioResult } from '../domain/property.ts';
+import { cfTitle } from './propertyShared.tsx';
 import { normalizeInputs, simulate } from '../domain/simulator.ts';
 import { Button, EmptyState, KeyValue, PageHeader, Section, StatusBadge, Tabs, TextInput, useConfirm } from '../ui/components.tsx';
 import { href, navigate } from '../ui/router.ts';
@@ -33,6 +34,9 @@ export function PropertyDetailPage({ id }: { id: string }) {
   const tasks = data.tasks.filter((t) => t.property_id === p.id);
   const openTasks = tasks.filter((t) => !t.done_at).length;
   const r = m.result;
+  const today = todayParis();
+  const cf = owned ? ownedCashflow(p, propertyRentalSummary(p.id, Number(today.slice(0, 4)), today, data).activeLeases, r, today) : null;
+  const loan = owned ? loanInfo(p, today) : null;
 
   const tabs: [Tab, string][] = [
     ['synthese', 'Synthèse'],
@@ -83,7 +87,9 @@ export function PropertyDetailPage({ id }: { id: string }) {
         <Figure label="Prix proposé" value={money(p.offer_price)} />
         <Figure label="Prix / m²" value={money(m.pricePerM2)} />
         <Figure label="Rendement brut" value={pct(r?.grossYield)} />
-        <Figure label="Cash-flow / mois" value={money(r?.cashflowMonthlyYear1)} tone={r ? (r.cashflowMonthlyYear1 >= 0 ? 'pos' : 'neg') : undefined} hint="avant fiscalité, année 1" />
+        {owned
+          ? <Figure label="Cash-flow / mois" value={money(cf?.monthly)} tone={cf ? (cf.monthly >= 0 ? 'pos' : 'neg') : undefined} hint={cfTitle(cf)} />
+          : <Figure label="Cash-flow / mois" value={money(r?.cashflowMonthlyYear1)} tone={r ? (r.cashflowMonthlyYear1 >= 0 ? 'pos' : 'neg') : undefined} hint="avant fiscalité, année 1" />}
       </div>
 
       <Tabs tabs={tabs} value={tab} onChange={setTab} />
@@ -100,6 +106,11 @@ export function PropertyDetailPage({ id }: { id: string }) {
                 ['Loyer charges comprises', rentWithCharges(p) != null ? `${money2(rentWithCharges(p))} / mois` : '—'],
                 ...ANNUAL_CHARGE_FIELDS.filter(([k]) => p[k] != null).map(([k, label]) => [`${label}`, `${money2(p[k]!)} / an`] as [string, string]),
                 ...(annualChargesTotal(p) != null ? [['Total des charges', `${money2(annualChargesTotal(p))} / an`] as [string, string]] : []),
+                ...(loan ? [
+                  ['Crédit', `${money(p.loan_amount ?? null)}${p.loan_rate != null ? ` à ${String(p.loan_rate).replace('.', ',')} %` : ''}${p.loan_years ? ` sur ${String(p.loan_years).replace('.', ',')} ans` : ''}`],
+                  ['Mensualité de crédit', loan.finished ? 'Crédit remboursé' : `${money2(loan.payment + loan.insurance)} / mois (dont assurance ${money2(loan.insurance)})`],
+                  ...(loan.remaining != null ? [['Capital restant dû', `${money2(loan.remaining)}${loan.endDate ? ` (fin le ${date(loan.endDate)})` : ''}`]] : []),
+                ] as [string, string][] : [['Crédit', 'Non renseigné']] as [string, string][]),
               ] as [string, string][] : [
                 ['Budget travaux', money(p.works_budget)],
                 ['Loyer estimé', p.estimated_rent ? `${money(p.estimated_rent)} / mois` : '—'],
@@ -116,7 +127,7 @@ export function PropertyDetailPage({ id }: { id: string }) {
                 ['Relance', p.follow_up_date ? <span className={p.follow_up_date <= todayParis() ? 'neg' : ''}>{date(p.follow_up_date)}</span> : '—'],
                 ['Visite', dateTime(p.visit_at)],
               ] as [string, React.ReactNode][]),
-              ...(p.legacy_ref ? [['Origine', `Reprise IDF Invest (${p.legacy_ref})`] as [string, string]] : []),
+              ...(p.legacy_ref ? [['Origine', `Reprise de l’ancienne version (${p.legacy_ref})`] as [string, string]] : []),
             ]} />
           </Section>
           <div>
