@@ -29,7 +29,7 @@ Même ordre qu'en test. Vérifiez le contrôle de comptage indiqué dans [MIGRAT
 
 ## Adresse de l'application
 
-Depuis le 16/10/2026, le dépôt s'appelle `DGIRD/immo-zen` et l'application est publiée sur **https://dgird.github.io/immo-zen/** (l'ancienne adresse `…/idf-invest/` ne répond plus). Dans Supabase → Authentication → URL Configuration : *Site URL* = `https://dgird.github.io/immo-zen/`, et ajouter la même adresse (ou `https://dgird.github.io/immo-zen/**`) dans *Redirect URLs*, sans quoi les liens de réinitialisation du mot de passe renverraient vers l'ancienne adresse. Une application installée depuis l'ancienne adresse doit être réinstallée depuis la nouvelle.
+L'adresse suit le nom du dépôt. Pour publier sur **https://dgird.github.io/immo-zen/** : GitHub → Settings → General → *Repository name* = `immo-zen` → **Rename**, puis Actions → « Déploiement » → **Run workflow** (l'ancienne adresse `…/idf-invest/` cesse alors de répondre ; aucun réglage du code n'est nécessaire, les chemins sont relatifs). Dans Supabase → Authentication → URL Configuration : *Site URL* = `https://dgird.github.io/immo-zen/`, et ajouter la même adresse (ou `https://dgird.github.io/immo-zen/**`) dans *Redirect URLs*, sans quoi les liens de réinitialisation du mot de passe renverraient vers l'ancienne adresse. Une application installée depuis l'ancienne adresse doit être réinstallée depuis la nouvelle.
 
 ## Retour arrière
 
