@@ -530,11 +530,43 @@ async function main() {
     await page.getByText('Loyers impayés échus').waitFor();
   });
 
-  await step('rubriques du lot 3 clairement signalées', async () => {
-    for (const r of ['abonnement']) {
-      await page.goto(url + `#/${r}`);
-      await page.getByText(/n’est pas encore disponible/).waitFor();
-    }
+  await step('abonnement et administration : offres, contrôle d’accès, prospects, accès support', async () => {
+    await page.goto(url + '#/abonnement');
+    await page.getByText('Les offres ne sont pas encore ouvertes').waitFor();
+    await page.getByRole('link', { name: 'Administration' }).click();
+    await page.getByRole('heading', { name: 'Administration' }).waitFor();
+    await page.getByRole('tab', { name: 'Offres et tarifs' }).click();
+    const plan = page.locator('.plan').first();
+    await plan.getByLabel('Prix TTC par mois').fill('9,90');
+    await plan.getByLabel('Offre ouverte aux abonnements').check();
+    await plan.getByRole('button', { name: 'Enregistrer' }).click();
+    await page.getByText('Une offre ouverte doit avoir un prix et un identifiant Stripe.').waitFor();
+    await plan.getByLabel('Identifiant du prix Stripe').fill('price_TEST123');
+    await plan.getByRole('button', { name: 'Enregistrer' }).click();
+    await page.getByText('Offre enregistrée.').waitFor();
+    await page.getByRole('tab', { name: 'Prospects commerciaux' }).click();
+    await page.getByRole('button', { name: 'Ajouter' }).click();
+    const dlg = page.locator('dialog[open]');
+    await dlg.getByLabel('Nom *').fill('Agence Durand');
+    await dlg.getByLabel('Origine').fill('Salon RENT');
+    await dlg.getByRole('button', { name: 'Enregistrer' }).click();
+    await page.getByRole('button', { name: 'Agence Durand' }).waitFor();
+    await page.getByRole('tab', { name: 'Contrôle d’accès' }).click();
+    await page.getByLabel('Exiger un abonnement pour modifier les données').check();
+    await page.getByRole('button', { name: 'Enregistrer' }).click();
+    await page.locator('dialog[open]').getByRole('button', { name: 'Activer' }).click();
+    await page.getByText('Configuration enregistrée.').waitFor();
+    await page.getByRole('tab', { name: 'Journal' }).click();
+    await page.getByText('configuration', { exact: true }).waitFor();
+    await page.screenshot({ path: join(out, '23-administration.png'), fullPage: true });
+    await page.goto(url + '#/abonnement');
+    await page.getByText('9,90 € / mois').waitFor();
+    assert.ok(await page.getByRole('button', { name: 'S’abonner' }).isDisabled(), 'aucun paiement en mode démonstration');
+    await page.screenshot({ path: join(out, '24-abonnement.png'), fullPage: true });
+    await page.goto(url + '#/parametres');
+    await page.getByRole('button', { name: 'Autoriser pendant 7 jours' }).click();
+    await page.getByText('Accès support autorisé pour 7 jours.').waitFor();
+    await page.getByRole('button', { name: 'Retirer l’autorisation' }).waitFor();
   });
 
   await step('rendu mobile (390 px) sans défilement horizontal', async () => {

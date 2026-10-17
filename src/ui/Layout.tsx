@@ -10,6 +10,8 @@ export interface NavItem {
   path: string;
   /** Lot de livraison si la rubrique n'est pas encore disponible. */
   plannedLot?: 2 | 3;
+  /** Visible des seuls administrateurs. */
+  adminOnly?: boolean;
 }
 
 export const NAV: NavItem[] = [
@@ -23,8 +25,9 @@ export const NAV: NavItem[] = [
   { key: 'contacts', label: 'Contacts', path: '/contacts' },
   { key: 'documents', label: 'Documents', path: '/documents' },
   { key: 'fiscal', label: 'Déclaration fiscale', path: '/declaration' },
-  { key: 'abonnement', label: 'Mon abonnement', path: '/abonnement', plannedLot: 3 },
+  { key: 'abonnement', label: 'Mon abonnement', path: '/abonnement' },
   { key: 'parametres', label: 'Paramètres', path: '/parametres' },
+  { key: 'admin', label: 'Administration', path: '/admin', adminOnly: true },
 ];
 
 function SyncIndicator() {
@@ -46,7 +49,7 @@ function SyncIndicator() {
 }
 
 export function Layout({ active, children }: { active: string; children: ReactNode }) {
-  const { session, signOut, repo, toasts, dismissToast, conflict, sync, data } = useStore();
+  const { session, signOut, repo, toasts, dismissToast, conflict, sync, data, platform } = useStore();
   const [open, setOpen] = useState(false);
   useEffect(() => { setOpen(false); }, [active]);
 
@@ -61,6 +64,12 @@ export function Layout({ active, children }: { active: string; children: ReactNo
       {data.missingTables.length > 0 && (
         <div className="offline-banner" role="alert">
           Mise à jour de la base requise : la gestion locative n’est pas encore installée dans Supabase. Exécutez la migration SQL du lot 2 (voir la documentation).
+        </div>
+      )}
+
+      {platform && !platform.access.has_access && (
+        <div className="offline-banner" role="alert">
+          Votre accès est en consultation seule (abonnement terminé ou absent) : vos données restent consultables et exportables. <a href={href('/abonnement')}>Voir mon abonnement</a>
         </div>
       )}
 
@@ -82,7 +91,7 @@ export function Layout({ active, children }: { active: string; children: ReactNo
       <div className="body">
         <nav id="main-nav" className={`sidenav${open ? ' open' : ''}`} aria-label="Navigation principale">
           <ul>
-            {NAV.map((n) => (
+            {NAV.filter((n) => !n.adminOnly || platform?.access.is_admin).map((n) => (
               <li key={n.key}>
                 <a href={href(n.path)} className={active === n.key ? 'active' : ''} aria-current={active === n.key ? 'page' : undefined}>
                   <span>{n.label}</span>

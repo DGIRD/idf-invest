@@ -1,3 +1,4 @@
+import { createDemoPlatform } from './platform.ts';
 /**
  * Mode démonstration : données stockées uniquement dans ce navigateur (localStorage).
  * Aucune sauvegarde en ligne, aucun e-mail, aucun paiement. Signalé en permanence dans l'interface.
@@ -226,6 +227,7 @@ export function createDemoRepo(storage: Storage = localStorage): Repo {
 
   return {
     mode: 'demo',
+    platform: createDemoPlatform(storage, () => (signedIn ? SESSION.userId : null), () => SESSION.email),
     async getSession() { return signedIn ? SESSION : null; },
     onAuthChange(cb) {
       listeners.push(cb);
@@ -426,7 +428,7 @@ export function createDemoRepo(storage: Storage = localStorage): Repo {
 export function resetDemo(storage: Storage = localStorage) {
   for (let i = storage.length - 1; i >= 0; i--) {
     const k = storage.key(i);
-    if (k === KEY || k?.startsWith(FILES)) storage.removeItem(k);
+    if (k === KEY || k?.startsWith(FILES) || k === 'immozen:demo:platform') storage.removeItem(k);
   }
 }
 

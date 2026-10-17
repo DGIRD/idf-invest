@@ -76,6 +76,10 @@ PDF, images, Word, Excel ou texte, 10 Mo maximum, rattachés à un bien, un bail
 
 Pour chaque bien détenu : locataire actif, « Loué » dès qu'un bail est en cours, loyers encaissés et dépenses payées depuis le 1er janvier, solde locatif et cash-flow réel (encaissements − dépenses payées, avant impôts, hors dépôt de garantie).
 
+## Mon abonnement
+
+État de votre accès (essai, abonnement, résiliation programmée, fin d'accès), offres et paiement sécurisé par Stripe, puis espace client Stripe pour les factures, le moyen de paiement et la résiliation. Si l'accès prend fin, vos données restent consultables et exportables. **Paramètres → Accès support** : autorisez, pour 7 jours, le support à consulter un résumé chiffré de votre compte.
+
 ## Contacts
 
 Agences, agents, artisans, notaires, banques… avec coordonnées, organisme, secteur, notes, date de relance, biens liés et échanges.

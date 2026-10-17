@@ -154,6 +154,22 @@ export function SettingsPage() {
         <p className="muted small">La déconnexion efface la copie locale de vos données sur cet appareil.</p>
       </Section>
 
+      {store.platform && (
+        <Section title="Accès support">
+          {store.platform.supportUntil && store.platform.supportUntil > new Date().toISOString() ? (
+            <>
+              <p>Le support Immo-Zen peut consulter un résumé chiffré de votre compte (nombre de biens, baux, impayés, e-mails en échec) jusqu’au <strong>{dateTime(store.platform.supportUntil)}</strong>. Chaque consultation est journalisée.</p>
+              <Button onClick={async () => { try { await repo.platform.setSupportAccess(null); await store.refreshPlatform(); notify('Accès support retiré.'); } catch (e) { notify(String((e as Error).message), 'error'); } }}>Retirer l’autorisation</Button>
+            </>
+          ) : (
+            <>
+              <p>Par défaut, personne chez Immo-Zen n’accède à vos données. En cas de problème, vous pouvez autoriser le support à consulter un résumé chiffré de votre compte pendant 7 jours.</p>
+              <Button onClick={async () => { try { await repo.platform.setSupportAccess(new Date(Date.now() + 7 * 86400000).toISOString()); await store.refreshPlatform(); notify('Accès support autorisé pour 7 jours.'); } catch (e) { notify(String((e as Error).message), 'error'); } }}>Autoriser pendant 7 jours</Button>
+            </>
+          )}
+        </Section>
+      )}
+
       {repo.mode === 'demo' && (
         <Section title="Mode démonstration">
           <div className="row">

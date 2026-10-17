@@ -4,7 +4,7 @@
 
 Application web progressive (PWA) de prospection immobilière et de gestion locative pour particuliers. Elle succède à l'ancienne version de l'application, dont les données sont reprises.
 
-> **État : lots 1 et 2 livrés** (prospection, Mes biens, simulateur, contacts, reprise de l'ancienne version ; locataires et baux, loyers et paiements, quittances, relances, dépenses, documents). Les rubriques du lot 3 (synthèse annuelle, abonnement, administration) sont signalées « non disponibles ». Détail exact : [docs/ETAT-DU-PROJET.md](docs/ETAT-DU-PROJET.md).
+> **État : lots 1, 2 et 3 livrés** (prospection, simulateur, Mes biens ; gestion locative ; import de relevés, déclaration fiscale, abonnements Stripe et administration). Les paiements et e-mails réels restent à configurer. Détail : [docs/ETAT-DU-PROJET.md](docs/ETAT-DU-PROJET.md).
 
 ## Démarrer en local
 
@@ -38,6 +38,7 @@ npm run build && npm run test:e2e   # parcours navigateur bureau et mobile, capt
 | [SERVICES-A-CONNECTER](docs/SERVICES-A-CONNECTER.md) | Supabase, Stripe, e-mails… |
 | [TACHES-SERVEUR](docs/TACHES-SERVEUR.md) | Tâches planifiées, e-mails, garde-fous, mise en route |
 | [DECLARATION-FISCALE](docs/DECLARATION-FISCALE.md) | Calcul des cases de la déclaration, sources |
+| [ABONNEMENTS](docs/ABONNEMENTS.md) | Stripe, accès, administration, mise en service |
 | [TESTS](docs/TESTS.md) | Ce qui est testé et derniers résultats |
 
 L'ancienne application est conservée, non publiée, dans `legacy/idf-invest/` pour référence.
