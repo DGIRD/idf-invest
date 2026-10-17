@@ -1,3 +1,4 @@
+import type { PlatformState } from './platform.ts';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { userDefaults, type SimulationInputs } from '../domain/simulator.ts';
 import { describeError, EMPTY_SNAPSHOT, RepoError, SNAPSHOT_KEY, type Repo, type SessionInfo, type Snapshot } from './repo.ts';
@@ -26,6 +27,9 @@ interface StoreValue {
   conflict: ConflictRequest | null;
   toasts: Toast[];
   simulatorDefaults: SimulationInputs;
+  /** Accès et abonnement (undefined : en cours de chargement ; null : migration du lot 3 absente). */
+  platform: PlatformState | null | undefined;
+  refreshPlatform(): Promise<void>;
   notify(message: string, tone?: Toast['tone']): void;
   dismissToast(id: number): void;
   refresh(): Promise<void>;
@@ -91,6 +95,7 @@ export function StoreProvider({ repo, children }: { repo: Repo; children: ReactN
     });
   }, [persist]);
 
+  const [platform, setPlatform] = useState<PlatformState | null | undefined>(undefined);
   const refresh = useCallback(async () => {
     const s = sessionRef.current;
     if (!s) return;
@@ -102,6 +107,7 @@ export function StoreProvider({ repo, children }: { repo: Repo; children: ReactN
     setSync((x) => ({ ...x, state: 'loading' }));
     try {
       const snap = await repo.loadAll();
+      void repo.platform.state().then(setPlatform).catch(() => setPlatform(null));
       setData(snap);
       persist(snap);
       setSync({ state: 'synced', lastSync: snap.loadedAt });
@@ -120,7 +126,7 @@ export function StoreProvider({ repo, children }: { repo: Repo; children: ReactN
     }).catch(() => setAuthReady(true));
     const off = repo.onAuthChange((s, event) => {
       setSession((prev) => (prev?.userId === s?.userId ? prev : s));
-      if (event === 'SIGNED_OUT') { setData(EMPTY); purgePrivateCache(); }
+      if (event === 'SIGNED_OUT') { setData(EMPTY); setPlatform(undefined); purgePrivateCache(); }
     });
     return () => { alive = false; off(); };
   }, [repo]);
@@ -298,10 +304,14 @@ export function StoreProvider({ repo, children }: { repo: Repo; children: ReactN
     setSession(null);
   }, [repo]);
 
+  const refreshPlatform = useCallback(async () => {
+    try { setPlatform(await repo.platform.state()); } catch { setPlatform(null); }
+  }, [repo]);
+
   const simulatorDefaults = useMemo(() => userDefaults(data.settings?.simulator_defaults as Record<string, unknown> | undefined), [data.settings]);
 
   const value: StoreValue = {
-    repo, session, authReady, data, sync, conflict, toasts, simulatorDefaults,
+    repo, session, authReady, data, sync, conflict, toasts, simulatorDefaults, platform, refreshPlatform,
     notify, dismissToast, refresh, create, createMany, update, remove, removeWhere, updateWhere, call, saveSettings, signOut,
   };
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

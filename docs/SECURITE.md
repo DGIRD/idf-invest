@@ -19,6 +19,15 @@ Vérifié par `npm run test:db` avec deux comptes (lecture, modification, suppre
 - Documents : bucket privé, chemin imposé `<id utilisateur>/<id document>/<fichier>` (vérifié par la base et par les politiques du stockage), 10 Mo maximum, types limités (PDF, images, Word, Excel, texte), accès par lien signé de 60 secondes. La suppression d'une fiche met le fichier en file de suppression côté serveur.
 - Fonction serveur : appel authentifié par un jeton (`CRON_SECRET`) stocké dans le coffre Supabase ; clé `service_role` uniquement côté serveur ; aucun envoi sans `EMAIL_ENABLED=true` ; journaux sans adresse e-mail ni contenu.
 
+## Plateforme (lot 3)
+
+- Abonnements écrits uniquement par le serveur (webhook Stripe signé, clé service_role) ou par un administrateur via des fonctions journalisées ; un utilisateur ne peut ni s'attribuer un abonnement ni se nommer administrateur (testé).
+- Administrateurs désignés en SQL uniquement (table `admins`, aucun droit d'écriture par l'API).
+- Les administrateurs voient e-mail, dates et état d'abonnement des comptes, jamais leurs biens, baux, locataires ou documents. Exception : résumé chiffré, si l'abonné a autorisé l'accès support (31 jours au plus), chaque consultation étant journalisée.
+- Contrôle d'accès par abonnement : politiques RLS restrictives sur les écritures, désactivées tant que `app_config.enforce_subscription` est faux.
+- Invitations par Supabase Auth : l'invité choisit son mot de passe, aucun mot de passe n'est envoyé.
+- Secrets Stripe (`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`) uniquement dans les secrets des fonctions ; le navigateur ne voit jamais de carte bancaire (Stripe Checkout).
+
 ## Secrets
 
 - Le frontend ne contient que l'URL et la clé **publique** du projet. Le build échoue si la clé fournie est une clé `service_role` ou `sb_secret_`.

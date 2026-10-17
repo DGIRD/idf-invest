@@ -1,4 +1,4 @@
-# État du projet — lots 1 et 2 (16 octobre 2026)
+# État du projet — lots 1, 2 et 3 (17 octobre 2026)
 
 Légende : **Implémenté et testé** = code livré et couvert par un test automatisé exécuté · **Implémenté** = code livré, vérifié à la main seulement · **À configurer** = code livré, nécessite un service externe · **Restant** = non commencé.
 
@@ -60,17 +60,22 @@ Légende : **Implémenté et testé** = code livré et couvert par un test autom
 | Icônes Immo-Zen ; adresse https://dgird.github.io/immo-zen/ | Implémenté (icônes) / **à configurer** (renommer le dépôt, voir DEPLOIEMENT) | — |
 | Exports .xlsx / CSV des échéances, paiements, dépenses ; sauvegarde JSON incluant la gestion locative | Implémenté | — |
 
-## Livré dans le lot 3 (en cours)
+## Livré dans le lot 3
 
 | Fonction | État | Preuve |
 |---|---|---|
 | Import en masse des dépenses et recettes (Excel .xlsx, CSV, copier-coller) : colonnes reconnues, catégories de la liste, logement d'après l'adresse, aperçu ligne par ligne, anti-doublon | Implémenté et testé | unitaires + SQL + e2e |
 | Nouvelles catégories de dépenses ; « Loyer » enregistré comme recette, compté dans les encaissements et le cash-flow réel | Implémenté et testé | unitaires + e2e |
+| Abonnements Stripe : Checkout, espace client, webhook signé et idempotent, résiliation programmée, échec de paiement, expiration | Implémenté et testé (logique, SQL) / **à configurer** (compte Stripe, secrets, déploiement) | SQL + unitaires |
+| Contrôle d'accès par abonnement dans les règles RLS (désactivé par défaut ; lecture et export conservés) | Implémenté et testé | SQL |
+| Mon abonnement : statut, période, échéance ou fin d'accès, factures et résiliation via Stripe | Implémenté et testé (démonstration) | e2e |
+| Administration : comptes, invitation sans mot de passe en clair, accès manuel, offres, contrôle d'accès, incidents, journal, prospects commerciaux séparés | Implémenté et testé (SQL, démonstration) / **à configurer** (premier administrateur, invitation) | SQL + e2e |
+| Accès support autorisé par l'abonné, limité et journalisé | Implémenté et testé | SQL + e2e |
 | Déclaration fiscale : micro-foncier (4BE), 2044 ligne par ligne et 4BA/4BB/4BC, micro-BIC (5ND), LMNP réel avec amortissements et report (5NA/5NY), saisies complémentaires, export Excel | Implémenté et testé (calculs) / **non validé par un professionnel** | unitaires + e2e |
 
 ## Restant
 
-**Lot 3 — plateforme** : abonnements Stripe (mensuel/annuel, webhooks vérifiés côté serveur, renouvellement, résiliation, échec, remboursement, expiration, événements dupliqués) ; contrôle d'accès par abonnement dans les règles RLS ; parcours d'invitation sans mot de passe en clair ; Mon abonnement ; administration (utilisateurs, tarifs, incidents, e-mails, journal, prospects commerciaux séparés, accès support journalisé) ; synthèse annuelle selon le régime renseigné ; import CSV.
+Tout le périmètre du cahier des charges est livré. Reste **à configurer** : compte Stripe et fonctions `platform` / `stripe-webhook` ([ABONNEMENTS](ABONNEMENTS.md)), premier administrateur, envoi réel des e-mails (Resend). Pistes ultérieures : vérification de l'abonnement dans les fonctions serveur (quittances, relances), réimport de la gestion locative depuis une sauvegarde, liasse 2031/2033 complète, travaux de rénovation énergétique et déficits antérieurs dans la déclaration.
 
 ## Limites connues
 

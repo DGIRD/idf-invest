@@ -3,3 +3,11 @@
 # La fonction est appelée par la planification avec son propre jeton (CRON_SECRET),
 # pas par un utilisateur connecté.
 verify_jwt = false
+
+[functions.stripe-webhook]
+# Appelée par Stripe, authentifiée par la signature de l'événement (STRIPE_WEBHOOK_SECRET).
+verify_jwt = false
+
+[functions.platform]
+# Appelée par l'application avec la session de l'utilisateur.
+verify_jwt = true

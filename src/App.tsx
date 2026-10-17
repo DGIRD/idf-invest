@@ -4,6 +4,8 @@ import { ComingSoonPage } from './pages/ComingSoon.tsx';
 import { ContactDetailPage, ContactsPage } from './pages/Contacts.tsx';
 import { DashboardPage } from './pages/Dashboard.tsx';
 import { FiscalPage } from './pages/Fiscal.tsx';
+import { AdminPage } from './pages/Admin.tsx';
+import { SubscriptionPage } from './pages/Subscription.tsx';
 import { OwnedPage } from './pages/Owned.tsx';
 import { PropertyDetailPage } from './pages/PropertyDetail.tsx';
 import { PropertyFormPage } from './pages/PropertyForm.tsx';
@@ -62,6 +64,8 @@ export function App() {
   else if (a === 'depenses') { active = 'depenses'; page = <ExpensesPage key={key} propertyId={route.query.get('bien') ?? undefined} />; }
   else if (a === 'documents') { active = 'documents'; page = <DocumentsPage />; }
   else if (a === 'declaration' || a === 'synthese') { active = 'fiscal'; page = <FiscalPage />; }
+  else if (a === 'abonnement') { active = 'abonnement'; page = <SubscriptionPage key={key} />; }
+  else if (a === 'admin') { active = 'admin'; page = <AdminPage />; }
   else {
     const item = NAV.find((n) => n.path === `/${a}`);
     if (item?.plannedLot) { active = item.key; page = <ComingSoonPage item={item} />; }

@@ -1,3 +1,4 @@
+import { createSupabasePlatform } from './platform.ts';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { EMPTY_SNAPSHOT, RepoError, type Repo, type SessionInfo, type Snapshot, type UpdateResult } from './repo.ts';
 import type { Insert, Patch, Receipt, Reminder, Tables, TableName, UserSettings, VersionedTable } from './types.ts';
@@ -39,6 +40,7 @@ export function createSupabaseRepo(url: string, anonKey: string): Repo {
 
   return {
     mode: 'supabase',
+    platform: createSupabasePlatform(sb),
 
     async getSession() {
       const { data } = await sb.auth.getSession();

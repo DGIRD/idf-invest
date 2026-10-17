@@ -1,3 +1,4 @@
+import type { PlatformApi } from './platform.ts';
 import type {
   Allocation, Contact, DepositMovement, DocumentRow, Expense, Insert, Lease, LeaseTenant, OutboxMessage, Patch, Payment, Property, PropertyTask,
   Receipt, Reminder, RentCharge, Scenario, Tables, TableName, Tenant, TimelineEvent, UserSettings, VersionedTable,
@@ -74,7 +75,7 @@ export interface Repo {
   updateWhere<T extends TableName>(table: T, match: Record<string, string>, patch: Patch<Tables[T]>): Promise<void>;
   remove(table: TableName, id: string): Promise<void>;
   removeWhere(table: TableName, match: Record<string, string>): Promise<void>;
-  saveSettings(version: number, patch: Partial<Pick<UserSettings, 'simulator_defaults' | 'ui_prefs' | 'rental_settings'>>): Promise<UpdateResult<UserSettings>>;
+  saveSettings(version: number, patch: Partial<Pick<UserSettings, 'simulator_defaults' | 'ui_prefs' | 'rental_settings' | 'tax_inputs'>>): Promise<UpdateResult<UserSettings>>;
 
   // Fonctions serveur (gestion locative)
   generateCharges(leaseId: string, until?: string): Promise<number>;
@@ -88,6 +89,9 @@ export interface Repo {
   /** Lien temporaire (durée en secondes) vers un fichier privé. */
   fileUrl(path: string, seconds: number): Promise<string>;
   removeFile(path: string): Promise<void>;
+
+  /** Abonnement, administration (lot 3). */
+  readonly platform: PlatformApi;
 }
 
 /** Message lisible pour une erreur PostgREST / réseau. */
