@@ -68,7 +68,7 @@ async function main() {
 
   await step('menu complet, sans états des lieux', async () => {
     const labels = await page.locator('#main-nav a').allInnerTexts();
-    for (const l of ['Tableau de bord', 'Prospection', 'Simulateur', 'Mes biens', 'Locataires et baux', 'Loyers et paiements', 'Dépenses', 'Contacts', 'Documents', 'Synthèse annuelle', 'Mon abonnement', 'Paramètres']) {
+    for (const l of ['Tableau de bord', 'Prospection', 'Simulateur', 'Mes biens', 'Locataires et baux', 'Loyers et paiements', 'Dépenses', 'Contacts', 'Documents', 'Déclaration fiscale', 'Mon abonnement', 'Paramètres']) {
       assert.ok(labels.some((x) => x.includes(l)), `menu : ${l}`);
     }
     const js = await page.evaluate(async () => {
@@ -448,6 +448,59 @@ async function main() {
     assert.match((await page.locator('.figure').first().innerText()).replace(/[\u202f\u00a0]/g, ' '), /800,00 €/);
   });
 
+  await step('import d’un relevé collé depuis Excel : catégories, logement, anti-doublon', async () => {
+    const T = (...c: string[]) => c.join('\t');
+    const text = [
+      T('Date', 'Libellé', 'Compte du mouvement', ' Montant(EUROS) ', 'Catégorie', 'Commentaires', 'Appartement'),
+      T('27/04/2023', 'VIREMENT INSTANTANE A SYNDICAT 8 RUELLE 18672 Paiement charges ', 'Compte La banque postal', '-319,35 € ', 'Charges de copropriété (dont travaux)', '', 'Parking détenu'),
+      T('13/06/2023', 'PRELEVEMENT DE SDC 8 PASSAGE RUE REF : 4921406', 'Compte La banque postal', '-535,43 € ', 'Charges de copropriété (dont travaux)', '', 'Parking détenu'),
+      T('15/01/2024', 'VIREMENT INSTANTANE A O REAL', 'Compte La banque postal', '-335,33 € ', 'Charges de copropriété (dont travaux)', '', 'Parking détenu'),
+      T('08/04/2024', 'VIREMENT INSTANTANE A O REAL Virement Charge T2 2024', 'Compte La banque postal', '-335,33 € ', 'Charges de copropriété (dont travaux)', '', 'Parking détenu'),
+      T('05/05/2024', 'VIR LOYER MAI', 'Compte La banque postal', '850,00 € ', 'Loyer', '', 'Parking détenu'),
+      T('15/10/2024', 'DGFIP TAXE FONCIERE', 'Compte La banque postal', '-900,00 € ', 'Taxe foncière ', '', 'Parking détenu'),
+      T('20/11/2024', 'BRICO', 'Compte La banque postal', '-40,00 € ', 'Divers', '', 'Parking détenu'),
+    ].join('\n');
+    await page.goto(url + '#/depenses');
+    await page.getByRole('button', { name: 'Importer (Excel, CSV)' }).click();
+    const dlg = page.locator('dialog[open]');
+    await dlg.getByLabel(/collez les lignes/).fill(text);
+    await dlg.getByRole('button', { name: 'Analyser le texte collé' }).click();
+    await dlg.getByText('6 prête(s)').waitFor();
+    await dlg.getByText('1 à compléter').waitFor();
+    await page.screenshot({ path: join(out, '21-import-depenses.png'), fullPage: true });
+    await dlg.getByLabel('Catégorie ligne 8').selectOption('entretien');
+    await dlg.getByRole('button', { name: 'Importer 7 ligne(s)' }).click();
+    await page.getByText('7 ligne(s) importée(s)').waitFor();
+    await page.getByLabel('Année').selectOption('2024');
+    await page.getByText('Recettes importées').waitFor();
+    // réimport : rien n'est ajouté
+    await page.getByRole('button', { name: 'Importer (Excel, CSV)' }).click();
+    await dlg.getByLabel(/collez les lignes/).fill(text);
+    await dlg.getByRole('button', { name: 'Analyser le texte collé' }).click();
+    await dlg.getByText('7 déjà importée(s)').waitFor();
+    assert.ok(await dlg.getByRole('button', { name: 'Importer 0 ligne(s)' }).isDisabled());
+    await dlg.getByRole('button', { name: 'Fermer' }).first().click();
+  });
+
+  await step('déclaration fiscale : 2044 au réel et cases de la 2042', async () => {
+    await page.goto(url + '#/declaration');
+    await page.getByLabel('Année des revenus').selectOption('2024');
+    await page.getByLabel('Régime de Parking détenu').selectOption('reel_foncier');
+    const table = page.locator('table.tax-2044');
+    await table.waitFor();
+    const row = async (code: string) => (await table.locator('tbody tr').filter({ has: page.getByRole('cell', { name: code, exact: true }) }).innerText()).replace(/[\u202f\u00a0]/g, ' ');
+    assert.match(await row('229'), /670,66 €/, 'provisions de copropriété payées en 2024');
+    assert.match(await row('227'), /900,00 €/);
+    assert.match(await row('224'), /40,00 €/);
+    assert.match(await row('211'), /803,15 €/, 'loyer importé, hors provision (850 × 780 / 825,50)');
+    await page.getByText('Case 4BA').first().waitFor();
+    await page.getByLabel('Ligne 230 : régularisation N−1').fill('100');
+    await page.getByRole('button', { name: 'Enregistrer les saisies' }).click();
+    await page.getByText('Saisies enregistrées.').waitFor();
+    assert.match(await row('230'), /100,00 €/);
+    await page.screenshot({ path: join(out, '22-declaration-fiscale.png'), fullPage: true });
+  });
+
   await step('documents : dépôt privé, contrôle du type', async () => {
     await page.goto(url + '#/documents');
     await page.getByRole('button', { name: 'Ajouter un document' }).first().click();
@@ -478,7 +531,7 @@ async function main() {
   });
 
   await step('rubriques du lot 3 clairement signalées', async () => {
-    for (const r of ['synthese', 'abonnement']) {
+    for (const r of ['abonnement']) {
       await page.goto(url + `#/${r}`);
       await page.getByText(/n’est pas encore disponible/).waitFor();
     }

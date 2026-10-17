@@ -22,7 +22,7 @@ export const NAV: NavItem[] = [
   { key: 'depenses', label: 'Dépenses', path: '/depenses' },
   { key: 'contacts', label: 'Contacts', path: '/contacts' },
   { key: 'documents', label: 'Documents', path: '/documents' },
-  { key: 'synthese', label: 'Synthèse annuelle', path: '/synthese', plannedLot: 3 },
+  { key: 'fiscal', label: 'Déclaration fiscale', path: '/declaration' },
   { key: 'abonnement', label: 'Mon abonnement', path: '/abonnement', plannedLot: 3 },
   { key: 'parametres', label: 'Paramètres', path: '/parametres' },
 ];

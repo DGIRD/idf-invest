@@ -3,6 +3,7 @@ import { AuthPage, NewPasswordPage } from './pages/Auth.tsx';
 import { ComingSoonPage } from './pages/ComingSoon.tsx';
 import { ContactDetailPage, ContactsPage } from './pages/Contacts.tsx';
 import { DashboardPage } from './pages/Dashboard.tsx';
+import { FiscalPage } from './pages/Fiscal.tsx';
 import { OwnedPage } from './pages/Owned.tsx';
 import { PropertyDetailPage } from './pages/PropertyDetail.tsx';
 import { PropertyFormPage } from './pages/PropertyForm.tsx';
@@ -60,6 +61,7 @@ export function App() {
   else if (a === 'loyers') { active = 'loyers'; page = <RentsPage />; }
   else if (a === 'depenses') { active = 'depenses'; page = <ExpensesPage key={key} propertyId={route.query.get('bien') ?? undefined} />; }
   else if (a === 'documents') { active = 'documents'; page = <DocumentsPage />; }
+  else if (a === 'declaration' || a === 'synthese') { active = 'fiscal'; page = <FiscalPage />; }
   else {
     const item = NAV.find((n) => n.path === `/${a}`);
     if (item?.plannedLot) { active = item.key; page = <ComingSoonPage item={item} />; }
