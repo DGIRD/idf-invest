@@ -37,6 +37,7 @@ npm run build && npm run test:e2e   # parcours navigateur bureau et mobile, capt
 | [GUIDE-UTILISATEUR](docs/GUIDE-UTILISATEUR.md) | Utilisation de l'application |
 | [SERVICES-A-CONNECTER](docs/SERVICES-A-CONNECTER.md) | Supabase, Stripe, e-mails… |
 | [TACHES-SERVEUR](docs/TACHES-SERVEUR.md) | Tâches planifiées, e-mails, garde-fous, mise en route |
+| [DECLARATION-FISCALE](docs/DECLARATION-FISCALE.md) | Calcul des cases de la déclaration, sources |
 | [TESTS](docs/TESTS.md) | Ce qui est testé et derniers résultats |
 
 L'ancienne application est conservée, non publiée, dans `legacy/idf-invest/` pour référence.

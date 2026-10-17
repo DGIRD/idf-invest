@@ -3,13 +3,14 @@ import { useStore } from '../../data/store.tsx';
 import type { Expense, ExpenseCategory, ExpenseNature, Insert } from '../../data/types.ts';
 import { downloadBlob, stamp, toCsv, toXlsx, type ExportColumn } from '../../domain/exporting.ts';
 import { date, money2, todayParis } from '../../domain/format.ts';
-import { defaultNature, EXPENSE_CATEGORY_LABELS, EXPENSE_NATURE_LABELS, expenseTotals } from '../../domain/rental.ts';
+import { defaultNature, EXPENSE_CATEGORY_LABELS, EXPENSE_NATURE_LABELS, expenseTotals, isIncome, MAIN_EXPENSE_CATEGORIES, OTHER_EXPENSE_CATEGORIES } from '../../domain/rental.ts';
+import { ExpenseImportDialog } from './ExpenseImport.tsx';
 import { round2 } from '../../domain/simulator.ts';
 import { DataTable, type Column } from '../../ui/DataTable.tsx';
 import { Button, EmptyState, Modal, NumberInput, PageHeader, Select, TextArea, TextInput, useConfirm } from '../../ui/components.tsx';
 import { checkFile, openDocument, useUpload } from './Documents.tsx';
 
-const CATS = Object.entries(EXPENSE_CATEGORY_LABELS) as [ExpenseCategory, string][];
+const CATS = [...MAIN_EXPENSE_CATEGORIES, ...OTHER_EXPENSE_CATEGORIES].map((k) => [k, EXPENSE_CATEGORY_LABELS[k]] as [ExpenseCategory, string]);
 const NATURES = Object.entries(EXPENSE_NATURE_LABELS) as [ExpenseNature, string][];
 const NATURE_HINT: Record<ExpenseNature, string> = {
   charge: 'Dépense courante de l’année (entretien, taxe, assurance, intérêts…).',
@@ -23,6 +24,7 @@ export function ExpensesPage({ propertyId }: { propertyId?: string }) {
   const { data } = store;
   const { ask, dialog } = useConfirm();
   const [edit, setEdit] = useState<Expense | 'new' | null>(null);
+  const [importing, setImporting] = useState(false);
   const [property, setProperty] = useState(propertyId ?? '');
   const [year, setYear] = useState(todayParis().slice(0, 4));
   const [status, setStatus] = useState<'' | 'paye' | 'a_payer'>('');
@@ -38,7 +40,8 @@ export function ExpensesPage({ propertyId }: { propertyId?: string }) {
     { id: 'nature', label: 'Nature', value: (e) => EXPENSE_NATURE_LABELS[e.nature] },
     { id: 'supplier', label: 'Fournisseur', value: (e) => e.supplier },
     { id: 'label', label: 'Libellé', value: (e) => e.label, defaultHidden: true },
-    { id: 'amount', label: 'Montant', value: (e) => e.amount, kind: 'money', align: 'right', render: (e) => money2(e.amount), mobile: true },
+    { id: 'amount', label: 'Montant', value: (e) => (isIncome(e) ? e.amount : -e.amount), kind: 'money', align: 'right', render: (e) => (isIncome(e) ? <span className="pos">+{money2(e.amount)}</span> : money2(e.amount)), mobile: true },
+    { id: 'account', label: 'Compte', value: (e) => e.account ?? null, defaultHidden: true },
     { id: 'recoverable', label: 'Récupérable', value: (e) => e.recoverable_amount, kind: 'money', align: 'right', render: (e) => (e.recoverable_amount ? money2(e.recoverable_amount) : '—') },
     { id: 'status', label: 'Paiement', value: (e) => (e.payment_status === 'paye' ? `Payée le ${date(e.paid_on)}` : 'À payer'),
       render: (e) => (e.payment_status === 'paye' ? <span className="muted">payée le {date(e.paid_on)}</span> : <span className="pill pill-warn">à payer</span>), mobile: true },
@@ -56,12 +59,16 @@ export function ExpensesPage({ propertyId }: { propertyId?: string }) {
   return (
     <>
       <PageHeader title="Dépenses" subtitle="Dépenses par bien, avec justificatif, part récupérable et nature (charge, immobilisation, capital, trésorerie)."
-        actions={<Button variant="primary" disabled={!owned.length} title={owned.length ? undefined : 'Ajoutez d’abord un bien dans Mes biens'} onClick={() => setEdit('new')}>Ajouter une dépense</Button>} />
+        actions={<>
+          <Button disabled={!owned.length} onClick={() => setImporting(true)}>Importer (Excel, CSV)</Button>
+          <Button variant="primary" disabled={!owned.length} title={owned.length ? undefined : 'Ajoutez d’abord un bien dans Mes biens'} onClick={() => setEdit('new')}>Ajouter une dépense</Button>
+        </>} />
       <div className="figures">
         <div className="figure"><span className="figure-label">Total {year || 'toutes années'}</span><span className="figure-value">{money2(t.total)}</span><span className="figure-hint">dont à payer {money2(t.toPay)}</span></div>
         <div className="figure"><span className="figure-label">Charges</span><span className="figure-value">{money2(t.byNature.charge)}</span><span className="figure-hint">récupérables {money2(t.recoverable)}</span></div>
         <div className="figure"><span className="figure-label">Immobilisations</span><span className="figure-value">{money2(t.byNature.immobilisation)}</span></div>
         <div className="figure"><span className="figure-label">Capital et trésorerie</span><span className="figure-value">{money2(round2(t.byNature.remboursement_capital + t.byNature.tresorerie))}</span><span className="figure-hint">hors charges</span></div>
+        {t.income > 0 && <div className="figure"><span className="figure-label">Recettes importées</span><span className="figure-value pos">{money2(t.income)}</span><span className="figure-hint">catégorie Loyer, hors dépenses</span></div>}
       </div>
       <DataTable id="depenses" rows={rows} columns={columns} rowKey={(e) => e.id} initialSort={{ id: 'date', dir: 'desc' }} onOpen={(e) => setEdit(e)}
         toolbar={<>
@@ -84,6 +91,7 @@ export function ExpensesPage({ propertyId }: { propertyId?: string }) {
       </div>
       <p className="muted small">La nature d’une dépense sert au suivi ; elle ne vaut pas qualification fiscale. Faites valider les cas particuliers (travaux, mobilier) par un professionnel.</p>
       <ExpenseDialog expense={edit} onClose={() => setEdit(null)} propertyId={property || propertyId} />
+      <ExpenseImportDialog open={importing} onClose={() => setImporting(false)} />
       {dialog}
     </>
   );
@@ -139,7 +147,7 @@ export function ExpenseDialog({ expense, onClose, propertyId }: { expense: Expen
         <Select label="Nature" value={d.nature!} onChange={(v) => set('nature', v ?? 'charge')} options={NATURES} hint={NATURE_HINT[d.nature!]} />
         <TextInput label="Fournisseur" value={d.supplier} onChange={(v) => set('supplier', v)} maxLength={200} />
         <TextInput label="Libellé" value={d.label} onChange={(v) => set('label', v)} maxLength={300} />
-        <NumberInput label="Montant TTC" suffix="€" value={d.amount ?? null} onChange={(v) => set('amount', v ?? undefined)} />
+        <NumberInput label={d.category === 'loyer' ? 'Montant reçu' : 'Montant TTC'} suffix="€" value={d.amount ?? null} onChange={(v) => set('amount', v ?? undefined)} />
         <NumberInput label="Part récupérable sur le locataire" suffix="€" value={d.recoverable_amount ?? 0} onChange={(v) => set('recoverable_amount', v ?? 0)} />
         <Select label="Statut" value={d.payment_status!} onChange={(v) => set('payment_status', v ?? 'paye')} options={[['paye', 'Payée'], ['a_payer', 'À payer']] as const} />
         {d.payment_status === 'paye' && <TextInput label="Payée le" type="date" value={d.paid_on} onChange={(v) => set('paid_on', v || null)} />}

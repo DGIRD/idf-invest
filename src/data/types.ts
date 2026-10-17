@@ -129,9 +129,26 @@ export interface UserSettings {
   simulator_defaults: Partial<SimulationInputs>;
   ui_prefs: Record<string, unknown>;
   rental_settings?: RentalSettings;
+  /** Saisies complémentaires de la déclaration fiscale, par année puis par bien. */
+  tax_inputs?: TaxInputs;
   version: number;
   updated_at: string;
 }
+
+export interface TaxPropertyInputs {
+  /** 2044 ligne 230 : régularisation des provisions pour charges déduites l'année précédente. */
+  regularisation?: number;
+  /** 2044 ligne 213 : recettes diverses (indemnités d'assurance…). */
+  other_income?: number;
+  /** LMNP réel : part du terrain non amortissable (%), durées d'amortissement (années). */
+  land_pct?: number;
+  building_years?: number;
+  furniture_years?: number;
+  works_years?: number;
+  /** Valeur amortissable retenue (sinon coût d'acquisition). */
+  depreciable_base?: number;
+}
+export type TaxInputs = Record<string, Record<string, TaxPropertyInputs>>;
 
 export interface ReminderTemplate {
   subject: string;
@@ -284,7 +301,8 @@ export interface DocumentRow extends Versioned {
   notes: string | null;
 }
 
-export type ExpenseCategory = 'copropriete' | 'taxe_fonciere' | 'assurance' | 'interets' | 'frais_bancaires' | 'travaux' | 'mobilier' | 'entretien' | 'gestion' | 'autre';
+export type ExpenseCategory = 'copropriete' | 'taxe_fonciere' | 'assurance' | 'interets' | 'frais_bancaires' | 'travaux' | 'mobilier' | 'entretien' | 'gestion' | 'autre'
+  | 'credit' | 'assurance_credit' | 'entretien_amortissable' | 'loyer' | 'frais_credit';
 export type ExpenseNature = 'charge' | 'immobilisation' | 'remboursement_capital' | 'tresorerie';
 export interface Expense extends Versioned {
   property_id: string;
@@ -299,6 +317,10 @@ export interface Expense extends Versioned {
   paid_on: string | null;
   document_id: string | null;
   notes: string | null;
+  /** Compte bancaire du mouvement (import). */
+  account?: string | null;
+  /** Empreinte de la ligne importée (anti-doublon). */
+  import_ref?: string | null;
 }
 
 export interface OutboxMessage {

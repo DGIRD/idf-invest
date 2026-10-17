@@ -408,3 +408,27 @@ button.figure { text-align: left; font: inherit; background: none; border: 0; bo
 .rent-mode .label { margin-right: .4rem; }
 .seg { border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink); padding: .35rem .9rem; border-radius: 99px; cursor: pointer; font-weight: 600; }
 .seg.on { background: var(--sapin); border-color: var(--sapin); color: var(--surface); }
+
+/* Import de relevés */
+.file-btn { position: relative; overflow: hidden; cursor: pointer; }
+.file-btn input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.import-start > * + * { margin-top: .9rem; }
+.import-summary { display: flex; flex-wrap: wrap; gap: .4rem .6rem; align-items: center; margin-bottom: .8rem; }
+.import-summary .pill { margin-left: 0; }
+.import-places { border: 1px solid var(--line, #dde3df); border-radius: 8px; padding: .6rem .8rem; margin: 0 0 .8rem; display: flex; flex-wrap: wrap; gap: .5rem 1.2rem; }
+.import-places legend { font-weight: 600; padding: 0 .3rem; }
+.import-table td.wrap { white-space: normal; min-width: 11rem; max-width: 22rem; }
+.import-table select { max-width: 11.5rem; }
+.import-table td, .import-table th { padding-left: .35rem; padding-right: .35rem; }
+.import-table tr.row-warn td { background: var(--ocre-tint); }
+.import-table .pill { margin-left: 0; white-space: nowrap; }
+
+/* Déclaration fiscale */
+.tax-boxes td, .tax-2044 td { vertical-align: top; }
+.tax-2044 tr.subtotal td { border-top: 1px solid var(--line-strong); font-weight: 600; }
+.tax-inputs { margin-top: 1rem; }
+.tax-input-group { display: contents; }
+.tax-input-group > .label { grid-column: 1 / -1; font-weight: 600; margin: .4rem 0 0; }
+.tax-result { max-width: 40rem; }
+.tax-lmnp { border-top: 1px solid var(--line); padding: .6rem 0; }
+.tax-lmnp > summary { cursor: pointer; }

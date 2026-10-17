@@ -55,7 +55,7 @@ const DEFAULTS: Partial<Record<TableName, Record<string, unknown>>> = {
   deposit_movements: { comment: null },
   reminders: { level: 1, charge_ids: [], debt_amount: 0, recipients: [], status: 'brouillon', created_by: 'proprietaire', sent_at: null, error: null },
   documents: { property_id: null, lease_id: null, tenant_id: null, category: 'autre', notes: null },
-  expenses: { supplier: null, label: null, nature: 'charge', recoverable_amount: 0, payment_status: 'paye', paid_on: null, document_id: null, notes: null },
+  expenses: { supplier: null, label: null, nature: 'charge', recoverable_amount: 0, payment_status: 'paye', paid_on: null, document_id: null, notes: null, account: null, import_ref: null },
 };
 const UNVERSIONED: TableName[] = ['timeline_events', 'lease_tenants', 'payment_allocations', 'deposit_movements'];
 const fail = (m: string): never => { throw new RepoError(m); };
@@ -109,6 +109,8 @@ export function createDemoRepo(storage: Storage = localStorage): Repo {
     if (table === 'expenses') {
       if (Number(rec.recoverable_amount ?? 0) > Number(rec.amount)) fail('Une valeur ne respecte pas les règles de saisie.');
       if (rec.payment_status === 'paye' && !rec.paid_on) fail('Indiquez la date de paiement.');
+      // index unique (user_id, import_ref) du serveur
+      if (rec.import_ref && db.expenses.some((e) => e.import_ref === rec.import_ref)) fail('Cette ligne de relevé a déjà été importée.');
     }
     if (table === 'documents' && Number(rec.size_bytes) > DEMO_FILE_LIMIT) fail('Fichier trop volumineux pour le mode démonstration (2 Mo).');
   }

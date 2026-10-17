@@ -60,6 +60,14 @@ Envoi automatique (option du bail) : la quittance part seule quand un paiement q
 
 Par bien : date, fournisseur, montant, catégorie, **nature** (charge, immobilisation, remboursement de capital, trésorerie), part récupérable sur le locataire, statut (payée ou à payer) et justificatif. Les totaux par nature et l'export Excel facilitent la préparation de la déclaration ; ils ne constituent pas une attestation fiscale.
 
+### Importer un relevé
+
+**Dépenses → Importer (Excel, CSV)** : choisissez un fichier .xlsx ou .csv, ou collez les lignes copiées depuis Excel, avec les colonnes *Date · Libellé · Compte du mouvement · Montant (EUROS) · Catégorie · Commentaires · Appartement* (seules Date et Montant sont obligatoires ; un modèle Excel est proposé). Montants négatifs = dépenses, positifs = recettes (catégorie Loyer). L'aperçu reconnaît les catégories (Crédit, Assurance crédit, Charges de copropriété (dont travaux), Assurance, Taxe foncière, Entretien amortissable ou non, Loyer, Frais bancaires / financiers, Meuble, Frais de crédit) et le logement d'après l'adresse ou le titre du bien ; ce qui n'est pas reconnu se choisit ligne par ligne, ou une fois par adresse. Un relevé réimporté ne crée pas de doublon.
+
+## Déclaration fiscale
+
+Choisissez l'année des revenus : l'onglet indique, selon le régime de chaque bien (à choisir dans le tableau ou la fiche du bien), les cases à remplir — 4BE (micro-foncier), formulaire 2044 ligne par ligne puis 4BA / 4BB / 4BC (réel), 5ND (micro-BIC), 5NA / 5NY avec amortissements (LMNP au réel). Quelques montants se saisissent (régularisation des provisions de l'année précédente, recettes diverses, paramètres d'amortissement). Export Excel. Détail des règles : [DECLARATION-FISCALE](DECLARATION-FISCALE.md). C'est une aide au remplissage, pas un conseil fiscal.
+
 ## Documents
 
 PDF, images, Word, Excel ou texte, 10 Mo maximum, rattachés à un bien, un bail ou une dépense. Ils sont privés : chaque ouverture passe par un lien valable 60 secondes. Supprimer un document supprime aussi le fichier.

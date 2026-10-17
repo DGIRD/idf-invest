@@ -226,9 +226,11 @@ export function propertyRentalSummary(propertyId: string, year: number, today: s
   const chargeIds = new Set(charges.map((c) => c.id));
   const ledger = leaseLedger(charges, payments, d.allocations.filter((a) => chargeIds.has(a.charge_id)), today);
   const y = String(year);
-  const received = round2(payments.filter((p) => p.paid_on.startsWith(y)).reduce((a, p) => a + p.amount, 0));
-  const expensesPaid = round2(d.expenses.filter((e) => e.property_id === propertyId && e.payment_status === 'paye' && (e.paid_on ?? e.expense_date).startsWith(y))
-    .reduce((a, e) => a + e.amount, 0));
+  const inYear = d.expenses.filter((e) => e.property_id === propertyId && e.payment_status === 'paye' && (e.paid_on ?? e.expense_date).startsWith(y));
+  const importedIncome = round2(inYear.filter(isIncome).reduce((a, e) => a + e.amount, 0));
+  const expensesPaid = round2(inYear.filter((e) => !isIncome(e)).reduce((a, e) => a + e.amount, 0));
+  // encaissements = paiements saisis sur les baux + recettes importées d'un relevé
+  const received = round2(payments.filter((p) => p.paid_on.startsWith(y)).reduce((a, p) => a + p.amount, 0) + importedIncome);
   return { activeLeases, tenantNames, received, expensesPaid, balance: ledger.balance, overdue: ledger.overdue, cashflow: round2(received - expensesPaid) };
 }
 
@@ -257,20 +259,30 @@ export function renderTemplate(tpl: string, vars: { locataires: string; montant:
 }
 
 // ---------- Dépenses ----------
-export const EXPENSE_CATEGORY_LABELS = {
-  copropriete: 'Copropriété', taxe_fonciere: 'Taxe foncière', assurance: 'Assurances', interets: 'Intérêts d’emprunt',
-  frais_bancaires: 'Frais bancaires', travaux: 'Travaux', mobilier: 'Mobilier', entretien: 'Entretien', gestion: 'Gestion', autre: 'Autres dépenses',
-} as const;
+export const EXPENSE_CATEGORY_LABELS: Record<Expense['category'], string> = {
+  credit: 'Crédit', assurance_credit: 'Assurance crédit', copropriete: 'Charges de copropriété (dont travaux)', assurance: 'Assurance',
+  taxe_fonciere: 'Taxe foncière', entretien_amortissable: 'Entretien, petits travaux amortissables', entretien: 'Entretien, petits travaux non amortissables',
+  loyer: 'Loyer (recette)', frais_bancaires: 'Frais bancaires / financiers', mobilier: 'Meuble', frais_credit: 'Frais de crédit',
+  gestion: 'Gestion locative', interets: 'Intérêts d’emprunt', travaux: 'Travaux', autre: 'Autres dépenses',
+};
+/** Catégories proposées en premier (ordre de saisie) ; les suivantes restent disponibles. */
+export const MAIN_EXPENSE_CATEGORIES: Expense['category'][] = ['credit', 'assurance_credit', 'copropriete', 'assurance', 'taxe_fonciere', 'entretien_amortissable', 'entretien', 'loyer', 'frais_bancaires', 'mobilier', 'frais_credit'];
+export const OTHER_EXPENSE_CATEGORIES: Expense['category'][] = ['gestion', 'interets', 'travaux', 'autre'];
+/** La catégorie « Loyer » enregistre une recette (mouvement crédité sur le compte), pas une dépense. */
+export const isIncome = (e: Pick<Expense, 'category'>) => e.category === 'loyer';
 export const EXPENSE_NATURE_LABELS = {
   charge: 'Charge', immobilisation: 'Immobilisation', remboursement_capital: 'Remboursement de capital', tresorerie: 'Trésorerie seule',
 } as const;
 /** Nature proposée par défaut selon la catégorie (modifiable : des travaux peuvent être une charge ou une immobilisation). */
 export function defaultNature(category: Expense['category']): Expense['nature'] {
-  if (category === 'mobilier') return 'immobilisation';
+  if (category === 'mobilier' || category === 'entretien_amortissable') return 'immobilisation';
+  if (category === 'credit' || category === 'loyer') return 'tresorerie';
   return 'charge';
 }
 
 export interface ExpenseTotals {
+  /** Recettes importées (catégorie « Loyer »), exclues des dépenses. */
+  income: number;
   total: number;
   paid: number;
   toPay: number;
@@ -279,8 +291,9 @@ export interface ExpenseTotals {
   byCategory: Partial<Record<Expense['category'], number>>;
 }
 export function expenseTotals(list: Expense[]): ExpenseTotals {
-  const t: ExpenseTotals = { total: 0, paid: 0, toPay: 0, recoverable: 0, byNature: { charge: 0, immobilisation: 0, remboursement_capital: 0, tresorerie: 0 }, byCategory: {} };
+  const t: ExpenseTotals = { income: 0, total: 0, paid: 0, toPay: 0, recoverable: 0, byNature: { charge: 0, immobilisation: 0, remboursement_capital: 0, tresorerie: 0 }, byCategory: {} };
   for (const e of list) {
+    if (isIncome(e)) { t.income = round2(t.income + e.amount); continue; }
     t.total = round2(t.total + e.amount);
     if (e.payment_status === 'paye') t.paid = round2(t.paid + e.amount); else t.toPay = round2(t.toPay + e.amount);
     t.recoverable = round2(t.recoverable + e.recoverable_amount);

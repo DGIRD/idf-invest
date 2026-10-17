@@ -60,6 +60,14 @@ Légende : **Implémenté et testé** = code livré et couvert par un test autom
 | Icônes Immo-Zen ; adresse https://dgird.github.io/immo-zen/ | Implémenté (icônes) / **à configurer** (renommer le dépôt, voir DEPLOIEMENT) | — |
 | Exports .xlsx / CSV des échéances, paiements, dépenses ; sauvegarde JSON incluant la gestion locative | Implémenté | — |
 
+## Livré dans le lot 3 (en cours)
+
+| Fonction | État | Preuve |
+|---|---|---|
+| Import en masse des dépenses et recettes (Excel .xlsx, CSV, copier-coller) : colonnes reconnues, catégories de la liste, logement d'après l'adresse, aperçu ligne par ligne, anti-doublon | Implémenté et testé | unitaires + SQL + e2e |
+| Nouvelles catégories de dépenses ; « Loyer » enregistré comme recette, compté dans les encaissements et le cash-flow réel | Implémenté et testé | unitaires + e2e |
+| Déclaration fiscale : micro-foncier (4BE), 2044 ligne par ligne et 4BA/4BB/4BC, micro-BIC (5ND), LMNP réel avec amortissements et report (5NA/5NY), saisies complémentaires, export Excel | Implémenté et testé (calculs) / **non validé par un professionnel** | unitaires + e2e |
+
 ## Restant
 
 **Lot 3 — plateforme** : abonnements Stripe (mensuel/annuel, webhooks vérifiés côté serveur, renouvellement, résiliation, échec, remboursement, expiration, événements dupliqués) ; contrôle d'accès par abonnement dans les règles RLS ; parcours d'invitation sans mot de passe en clair ; Mon abonnement ; administration (utilisateurs, tarifs, incidents, e-mails, journal, prospects commerciaux séparés, accès support journalisé) ; synthèse annuelle selon le régime renseigné ; import CSV.
